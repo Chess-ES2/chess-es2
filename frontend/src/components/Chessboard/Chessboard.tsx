@@ -5,6 +5,10 @@ import { usePieceDrag } from './usePieceDrag'
 import type { Color, PieceType, Square } from './types'
 import './Chessboard.css'
 
+interface ChessboardProps {
+  onNovaPartida: () => void;
+}
+
 type Piece = { color: Color; type: PieceType }
 type Board = Partial<Record<Square, Piece>>
 type PieceIds = Partial<Record<Square, string>>
@@ -97,12 +101,11 @@ function PlayerBar({ color, name, pieces, advantage, active }: {
   )
 }
 
-export default function Chessboard() {
+export default function Chessboard({ onNovaPartida }: ChessboardProps) {
   const boardId = useId()
   const boardRef = useRef<HTMLDivElement>(null)
   const [board, setBoard] = useState(initialBoard)
   const [pieceIds, setPieceIds] = useState(initialPieceIds)
-  const [gameNumber, setGameNumber] = useState(0)
   const [turn, setTurn] = useState<Color>('w')
   const [selected, setSelected] = useState<Square | null>(null)
   const [lastMove, setLastMove] = useState<Move | null>(null)
@@ -169,17 +172,6 @@ export default function Chessboard() {
     setSelected(null)
   }
 
-  function resetGame() {
-    drag.reset()
-    setBoard(initialBoard())
-    setPieceIds(initialPieceIds())
-    setCaptured({ w: [], b: [] })
-    setHistory([])
-    setTurn('w')
-    setGameNumber((number) => number + 1)
-    setSelected(null)
-    setLastMove(null)
-  }
 
   return (
     <MotionConfig reducedMotion="user" transition={{ type: 'spring', duration: 0.28, bounce: 0 }}>
@@ -187,8 +179,8 @@ export default function Chessboard() {
         <div className="game-layout">
           <div className="game-main">
             <PlayerBar color="b" name="Pretas" pieces={captured.b} advantage={advantage < 0 ? -advantage : 0} active={turn === 'b'} />
-            <LayoutGroup id={`${boardId}-${gameNumber}`}>
-              <div ref={boardRef} key={gameNumber} className={`board${drag.isDragging ? ' is-dragging' : ''}`} role="group" aria-label="Tabuleiro de xadrez"
+            <LayoutGroup id={`${boardId}`}>
+              <div ref={boardRef} className={`board${drag.isDragging ? ' is-dragging' : ''}`} role="group" aria-label="Tabuleiro de xadrez"
                 onKeyDown={(event) => {
                   if (event.key === 'Escape') {
                     drag.cancel()
@@ -272,7 +264,7 @@ export default function Chessboard() {
                 </svg>
                 Desfazer
               </button>
-              <button type="button" className="action-button primary" onClick={resetGame}>
+              <button type="button" className="action-button primary" onClick={onNovaPartida}>
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <circle cx="12" cy="12" r="9" />
                   <path d="M12 8v8M8 12h8" />
