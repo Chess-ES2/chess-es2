@@ -1,100 +1,106 @@
 import { useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, LayoutGroup, MotionConfig, motion } from 'motion/react'
-import { Chess, SQUARES } from 'chess.js'
-import type { Color, PieceSymbol, Square } from 'chess.js'
 import { usePieceDrag } from './usePieceDrag'
+import type { Color, PieceType, Square } from './types'
 import './Chessboard.css'
 
-const pieceNames: Record<PieceSymbol, string> = {
-  p: 'Peão', n: 'Cavalo', b: 'Bispo', r: 'Torre', q: 'Dama', k: 'Rei',
-}
+type Piece = { color: Color; type: PieceType }
+type Board = Partial<Record<Square, Piece>>
 type PieceIds = Partial<Record<Square, string>>
 
-// Posição inicial sem direitos de roque para ambos os lados.
-const initialPosition = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1'
+const pieceNames: Record<PieceType, string> = {
+  p: 'Peão', n: 'Cavalo', b: 'Bispo', r: 'Torre', q: 'Dama', k: 'Rei',
+}
+
+// Minúsculas são as pretas, maiúsculas as brancas.
+const initialRows = [
+  'rnbqkbnr',
+  'pppppppp',
+  '........',
+  '........',
+  '........',
+  '........',
+  'PPPPPPPP',
+  'RNBQKBNR',
+]
+
+const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] as const
+const squares = [8, 7, 6, 5, 4, 3, 2, 1].flatMap((rank) =>
+  files.map((file) => `${file}${rank}` as Square),
+)
+
+function initialBoard(): Board {
+  const board: Board = {}
+  initialRows.forEach((row, rowIndex) => {
+    [...row].forEach((code, fileIndex) => {
+      if (code === '.') return
+      board[`${files[fileIndex]}${8 - rowIndex}` as Square] = {
+        color: code === code.toUpperCase() ? 'w' : 'b',
+        type: code.toLowerCase() as PieceType,
+      }
+    })
+  })
+  return board
+}
 
 function initialPieceIds(): PieceIds {
-  const board = new Chess(initialPosition)
-  return Object.fromEntries(SQUARES.filter((square) => board.get(square)).map((square) => [square, square]))
+  return Object.fromEntries(squares.map((square) => [square, square]))
 }
 
-function pieceImage(color: Color, type: PieceSymbol) {
+function pieceImage(color: Color, type: PieceType) {
   return `https://lichess1.org/assets/piece/cburnett/${color}${type.toUpperCase()}.svg`
-}
-
-function availableMoves(game: Chess, square?: Square) {
-  return game.moves({ square, verbose: true }).filter((move) => !move.isPromotion())
-}
-
-function gameStatus(game: Chess, hasMoves: boolean) {
-  if (!hasMoves && game.isCheck()) {
-    return `Xeque-mate! Vitória das ${game.turn() === 'w' ? 'pretas' : 'brancas'}.`
-  }
-  if (!hasMoves) return 'Empate por afogamento.'
-  if (game.isThreefoldRepetition()) return 'Empate por repetição de posição.'
-  if (game.isInsufficientMaterial()) return 'Empate por material insuficiente.'
-  if (game.isDraw()) return 'Empate pela regra dos 50 lances.'
-  return `Vez das ${game.turn() === 'w' ? 'brancas' : 'pretas'}${game.isCheck() ? ' — xeque!' : '.'}`
 }
 
 export default function Chessboard() {
   const boardId = useId()
   const boardRef = useRef<HTMLDivElement>(null)
-  const [game, setGame] = useState(() => new Chess(initialPosition))
+  const [board, setBoard] = useState(initialBoard)
   const [pieceIds, setPieceIds] = useState(initialPieceIds)
   const [gameNumber, setGameNumber] = useState(0)
+  const [turn, setTurn] = useState<Color>('w')
   const [selected, setSelected] = useState<Square | null>(null)
   const [lastMove, setLastMove] = useState<{ from: Square; to: Square } | null>(null)
-  const moves = availableMoves(game)
-  const gameOver = moves.length === 0 || game.isDraw()
-  const legalMoves = selected && !gameOver ? moves.filter((move) => move.from === selected) : []
   const drag = usePieceDrag({ boardRef, onSelect: setSelected, onDrop: dropPiece })
 
+  // Qualquer peça pode ir para qualquer casa, sem validação de regras.
   function moveTo(to: Square, from = selected) {
-    if (!from || !moves.some((move) => move.from === from && move.to === to)) return
-    // Preserve history for repetition detection without mutating React state.
-    const nextGame = new Chess(initialPosition)
-    nextGame.loadPgn(game.pgn())
-    const move = nextGame.move({ from, to })
+    if (!from || from === to || !board[from]) return
+    const nextBoard = { ...board, [to]: board[from] }
+    delete nextBoard[from]
     const nextIds = { ...pieceIds, [to]: pieceIds[from] }
     delete nextIds[from]
-    if (move.isEnPassant()) {
-      const capturedSquare = `${to[0]}${from[1]}` as Square
-      delete nextIds[capturedSquare]
-    }
+    setBoard(nextBoard)
     setPieceIds(nextIds)
-    setGame(nextGame)
     setLastMove({ from, to })
     setSelected(null)
+    setTurn(turn === 'w' ? 'b' : 'w')
   }
 
   function dropPiece(from: Square, to: Square): Square {
-    if (gameOver) return from
-    const move = moves.find((candidate) => candidate.from === from && candidate.to === to)
-    if (!move) return from
+    if (from === to || !board[from]) return from
     moveTo(to, from)
     return to
   }
 
   function selectSquare(square: Square) {
-    if (gameOver) return
     if (square === selected) {
       setSelected(null)
       return
     }
-    const move = legalMoves.find((candidate) => candidate.to === square)
-    if (move) {
+    const piece = board[square]
+    if (selected && (!piece || piece.color !== turn)) {
       moveTo(square)
       return
     }
-    setSelected(game.get(square)?.color === game.turn() ? square : null)
+    setSelected(piece?.color === turn ? square : null)
   }
 
   function resetGame() {
     drag.reset()
-    setGame(new Chess(initialPosition))
+    setBoard(initialBoard())
     setPieceIds(initialPieceIds())
+    setTurn('w')
     setGameNumber((number) => number + 1)
     setSelected(null)
     setLastMove(null)
@@ -104,7 +110,7 @@ export default function Chessboard() {
     <MotionConfig reducedMotion="user" transition={{ type: 'spring', duration: 0.28, bounce: 0 }}>
       <section className="chess-game" aria-label="Partida de xadrez">
         <div className="game-toolbar">
-          <p className="game-status" role="status">{gameStatus(game, moves.length > 0)}</p>
+          <p className="game-status" role="status">Vez das {turn === 'w' ? 'brancas' : 'pretas'}.</p>
           <button type="button" className="reset-button" onClick={resetGame}>Nova partida</button>
         </div>
         <LayoutGroup id={`${boardId}-${gameNumber}`}>
@@ -115,24 +121,22 @@ export default function Chessboard() {
                 setSelected(null)
               }
             }}>
-            {SQUARES.map((square, index) => {
-              const piece = game.get(square)
+            {squares.map((square, index) => {
+              const piece = board[square]
               const isDark = (Math.floor(index / 8) + index % 8) % 2 === 1
-              const move = legalMoves.find((candidate) => candidate.to === square)
               const isSelected = selected === square
               const isLastMove = lastMove?.from === square || lastMove?.to === square
-              const canDrag = piece?.color === game.turn() && !gameOver
+              const canDrag = piece?.color === turn
               const description = piece ? `${pieceNames[piece.type]} (${piece.color === 'w' ? 'brancas' : 'pretas'})` : 'vazia'
 
               return (
                 <button key={square} type="button" data-square={square}
                   className={['square', isDark ? 'dark' : 'light', isSelected && 'selected',
-                    isLastMove && 'last-move', move && 'legal-destination',
-                    canDrag && 'draggable-square', move && drag.hovered === square && 'drop-target',
+                    isLastMove && 'last-move', canDrag && 'draggable-square',
+                    drag.isDragging && drag.hovered === square && 'drop-target',
                   ].filter(Boolean).join(' ')}
-                  aria-label={`${square}: ${description}${move ? (move.captured ? ', captura disponível' : ', movimento disponível') : ''}`}
+                  aria-label={`${square}: ${description}`}
                   aria-pressed={isSelected}
-                  disabled={gameOver}
                   onPointerDown={(event) => {
                     drag.preparePointer()
                     if (canDrag && piece) {
@@ -154,18 +158,12 @@ export default function Chessboard() {
                       initial={false} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                       transition={{ layout: { type: 'spring', duration: 0.28, bounce: 0 }, opacity: { duration: 0.12 } }} />}
                   </AnimatePresence>
-                  <AnimatePresence initial={false}>
-                    {move && <motion.span key="hint" className={`move-hint${move.captured ? ' capture-hint' : ''}`}
-                      initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.5 }} transition={{ duration: 0.15, type: 'tween' }}
-                      aria-hidden="true" />}
-                  </AnimatePresence>
                 </button>
               )
             })}
           </div>
         </LayoutGroup>
-        <p className="game-help">Arraste uma peça até um destino vermelho ou clique para mover.</p>
+        <p className="game-help">Arraste uma peça para qualquer casa ou clique para mover.</p>
       </section>
       {drag.floating && createPortal(
         <motion.div className="dragged-piece" aria-hidden="true"

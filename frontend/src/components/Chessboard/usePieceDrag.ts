@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent, RefObject } from 'react'
 import { animate, useMotionValue, useMotionValueEvent, useReducedMotion, useSpring, useTransform, useVelocity } from 'motion/react'
-import type { Color, PieceSymbol, Square } from 'chess.js'
+import type { Color, PieceType, Square } from './types'
 
-type DragPiece = { id: string; square: Square; color: Color; type: PieceSymbol }
+type DragPiece = { id: string; square: Square; color: Color; type: PieceType }
 type Grab = DragPiece & {
   pointerId: number
   element: HTMLButtonElement
