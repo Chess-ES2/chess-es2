@@ -104,6 +104,12 @@ function PlayerBar({ color, name, pieces, advantage, active }: {
   )
 }
 
+function getArrowCoords(sq: string) {
+  const file = sq.charCodeAt(0) - 97;
+  const rank = 8 - parseInt(sq[1], 10);
+  return { x: file * 12.5 + 6.25, y: rank * 12.5 + 6.25 };
+}
+
 export default function Chessboard({ onNovaPartida, mode, difficulty }: ChessboardProps) {
   const boardId = useId()
   const boardRef = useRef<HTMLDivElement>(null)
@@ -114,6 +120,8 @@ export default function Chessboard({ onNovaPartida, mode, difficulty }: Chessboa
   const [lastMove, setLastMove] = useState<Move | null>(null)
   const [captured, setCaptured] = useState<Captured>({ w: [], b: [] })
   const [history, setHistory] = useState<Move[]>([])
+  const [arrows, setArrows] = useState<Move[]>([])
+  const [drawingArrow, setDrawingArrow] = useState<Move | null>(null)
   const drag = usePieceDrag({ boardRef, onSelect: setSelected, onDrop: dropPiece })
 
   const advantage = capturedValue(captured.w) - capturedValue(captured.b)
@@ -181,6 +189,8 @@ export default function Chessboard({ onNovaPartida, mode, difficulty }: Chessboa
     hard: 'Difícil'
   };
 
+  const allArrows = [...arrows, drawingArrow].filter(Boolean) as Move[];
+
   return (
     <MotionConfig reducedMotion="user" transition={{ type: 'spring', duration: 0.28, bounce: 0 }}>
       <section className="chess-game" aria-label="Partida de xadrez">
@@ -189,12 +199,46 @@ export default function Chessboard({ onNovaPartida, mode, difficulty }: Chessboa
             <PlayerBar color="b" name="Pretas" pieces={captured.b} advantage={advantage < 0 ? -advantage : 0} active={turn === 'b'} />
             <LayoutGroup id={`${boardId}`}>
               <div ref={boardRef} className={`board${drag.isDragging ? ' is-dragging' : ''}`} role="group" aria-label="Tabuleiro de xadrez"
+              onContextMenu={(event) => event.preventDefault()}
+                onPointerLeave={() => setDrawingArrow(null)}
                 onKeyDown={(event) => {
                   if (event.key === 'Escape') {
                     drag.cancel()
                     setSelected(null)
                   }
                 }}>
+                  <svg style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  pointerEvents: 'none',
+                  zIndex: 10
+                }}>
+                  {allArrows.map((arrow, i) => {
+                    const start = getArrowCoords(arrow.from);
+                    const end = getArrowCoords(arrow.to);
+                    return (
+                      <g key={`${arrow.from}-${arrow.to}-${i}`} opacity={0.8}>
+                        <defs>
+                          <marker id={`arrowhead-${i}`} markerWidth="4" markerHeight="4" refX="2.5" refY="2" orient="auto">
+                            <polygon points="0 0, 4 2, 0 4" fill="#ffaa00" />
+                          </marker>
+                        </defs>
+                        <line
+                          x1={`${start.x}%`}
+                          y1={`${start.y}%`}
+                          x2={`${end.x}%`}
+                          y2={`${end.y}%`}
+                          stroke="#ffaa00"
+                          strokeWidth="2.5%"
+                          markerEnd={`url(#arrowhead-${i})`}
+                        />
+                      </g>
+                    );
+                  })}
+                </svg>
                 {squares.map((square, index) => {
                   const piece = board[square]
                   const isDark = (Math.floor(index / 8) + index % 8) % 2 === 1
@@ -212,16 +256,40 @@ export default function Chessboard({ onNovaPartida, mode, difficulty }: Chessboa
                       aria-label={`${square}: ${description}`}
                       aria-pressed={isSelected}
                       onPointerDown={(event) => {
+                        if (event.button === 2) {
+                          setDrawingArrow({ from: square, to: square })
+                          return
+                        }
                         drag.preparePointer()
                         if (canDrag && piece) {
                           drag.start(event, { id: pieceIds[square]!, square, color: piece.color, type: piece.type }, selected)
                         }
                       }}
+                      onPointerEnter={() => {
+                        if (drawingArrow) {
+                          setDrawingArrow({ from: drawingArrow.from, to: square })
+                        }
+                      }}
                       onPointerMove={drag.move}
-                      onPointerUp={drag.end}
+                      onPointerUp={(event) => {
+                        if (event.button === 2) {
+                          if (drawingArrow && drawingArrow.from !== square) {
+                            setArrows((prev) => {
+                              const jaExiste = prev.some((a) => a.from === drawingArrow.from && a.to === square)
+                              return jaExiste
+                                ? prev.filter((a) => !(a.from === drawingArrow.from && a.to === square))
+                                : [...prev, { from: drawingArrow.from, to: square }]
+                            })
+                          }
+                          setDrawingArrow(null)
+                          return
+                        }
+                        drag.end(event)
+                      }}
                       onPointerCancel={drag.cancel}
                       onLostPointerCapture={drag.cancel}
                       onClick={(event) => {
+                        setArrows([])
                         if (event.detail === 0 || !drag.consumeClick()) selectSquare(square)
                       }}>
                       {index % 8 === 0 && <span className="coord coord-rank" aria-hidden="true">{square[1]}</span>}
