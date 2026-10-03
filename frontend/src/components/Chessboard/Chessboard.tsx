@@ -3,10 +3,13 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, LayoutGroup, MotionConfig, motion } from 'motion/react'
 import { usePieceDrag } from './usePieceDrag'
 import type { Color, PieceType, Square } from './types'
+import type { GameMode, BotDifficulty } from '../../types'
 import './Chessboard.css'
 
 interface ChessboardProps {
   onNovaPartida: () => void;
+  mode: GameMode;
+  difficulty: BotDifficulty;
 }
 
 type Piece = { color: Color; type: PieceType }
@@ -101,7 +104,7 @@ function PlayerBar({ color, name, pieces, advantage, active }: {
   )
 }
 
-export default function Chessboard({ onNovaPartida }: ChessboardProps) {
+export default function Chessboard({ onNovaPartida, mode, difficulty }: ChessboardProps) {
   const boardId = useId()
   const boardRef = useRef<HTMLDivElement>(null)
   const [board, setBoard] = useState(initialBoard)
@@ -172,6 +175,11 @@ export default function Chessboard({ onNovaPartida }: ChessboardProps) {
     setSelected(null)
   }
 
+  const dificuldadeLabel = {
+    easy: 'Fácil',
+    medium: 'Médio',
+    hard: 'Difícil'
+  };
 
   return (
     <MotionConfig reducedMotion="user" transition={{ type: 'spring', duration: 0.28, bounce: 0 }}>
@@ -234,7 +242,9 @@ export default function Chessboard({ onNovaPartida }: ChessboardProps) {
             <PlayerBar color="w" name="Brancas" pieces={captured.w} advantage={advantage > 0 ? advantage : 0} active={turn === 'w'} />
           </div>
           <aside className="game-panel" aria-label="Informações da partida">
-            <header className="panel-header">Partida</header>
+            <header className="panel-header">
+              Partida {mode === 'bot' ? `vs Computador (${dificuldadeLabel[difficulty]})` : '(Multijogador Local)'}
+            </header>
             <div className="turn-card" role="status">
               <span className={`turn-dot ${turn}`} aria-hidden="true" />
               Vez das {turn === 'w' ? 'brancas' : 'pretas'}
