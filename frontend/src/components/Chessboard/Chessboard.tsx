@@ -7,7 +7,6 @@ import type { GameMode, BotDifficulty } from '../../types'
 import './Chessboard.css'
 
 interface ChessboardProps {
-  onNovaPartida: () => void;
   mode: GameMode;
   difficulty: BotDifficulty;
 }
@@ -110,7 +109,7 @@ function getArrowCoords(sq: string) {
   return { x: file * 12.5 + 6.25, y: rank * 12.5 + 6.25 };
 }
 
-export default function Chessboard({ onNovaPartida, mode, difficulty }: ChessboardProps) {
+export default function Chessboard({ mode, difficulty }: ChessboardProps) {
   const boardId = useId()
   const boardRef = useRef<HTMLDivElement>(null)
   const [board, setBoard] = useState(initialBoard)
@@ -123,6 +122,18 @@ export default function Chessboard({ onNovaPartida, mode, difficulty }: Chessboa
   const [arrows, setArrows] = useState<Move[]>([])
   const [drawingArrow, setDrawingArrow] = useState<Move | null>(null)
   const drag = usePieceDrag({ boardRef, onSelect: setSelected, onDrop: dropPiece })
+
+  function resetGame() {
+    drag.reset()
+    setBoard(initialBoard())
+    setPieceIds(initialPieceIds())
+    setCaptured({ w: [], b: [] })
+    setHistory([])
+    setArrows([])
+    setTurn('w')
+    setSelected(null)
+    setLastMove(null)
+  }
 
   const advantage = capturedValue(captured.w) - capturedValue(captured.b)
   const moveRows: Array<{ white: Move; black?: Move }> = []
@@ -342,7 +353,7 @@ export default function Chessboard({ onNovaPartida, mode, difficulty }: Chessboa
                 </svg>
                 Desfazer
               </button>
-              <button type="button" className="action-button primary" onClick={onNovaPartida}>
+              <button type="button" className="action-button primary" onClick={resetGame}>
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <circle cx="12" cy="12" r="9" />
                   <path d="M12 8v8M8 12h8" />

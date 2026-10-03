@@ -65,10 +65,9 @@ function App() {
           </header>
           
           <main className="game-content">
-            <Chessboard 
-              onNovaPartida={voltarParaMenu} 
-              mode={mode} 
-              difficulty={difficulty} 
+            <Chessboard
+             mode={mode}
+             difficulty={difficulty} 
             />
           </main>
         </div>
