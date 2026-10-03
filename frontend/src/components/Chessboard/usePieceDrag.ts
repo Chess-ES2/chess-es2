@@ -27,7 +27,6 @@ type DragOptions = {
   onDrop: (from: Square, to: Square) => Square
 }
 
-// Abaixo desse limiar (px/s) a peça não gira: só movimentos rápidos giram.
 const SPIN_THRESHOLD = 1500
 const SPIN_FACTOR = 0.5
 const MAX_SPIN = 2400
@@ -46,7 +45,6 @@ export function usePieceDrag({ boardRef, onSelect, onDrop }: DragOptions) {
   const spin = useMotionValue(0)
   const spinVelocity = useRef(0)
 
-  // Inércia do giro: atrito vai freando e uma mola traz de volta pra posição ereta.
   useAnimationFrame((_, delta) => {
     if (reducedMotion || !grab.current) return
     const step = Math.min(delta, 32) / 1000
@@ -94,7 +92,6 @@ export function usePieceDrag({ boardRef, onSelect, onDrop }: DragOptions) {
     spin.jump(0)
     spinVelocity.current = 0
     suppressClick.current = true
-    // Guarda onde a peça foi pega pra ela ficar presa nesse ponto do cursor.
     const rect = event.currentTarget.getBoundingClientRect()
     const size = rect.width * 0.9
     const left = rect.left + (rect.width - size) / 2
@@ -116,7 +113,6 @@ export function usePieceDrag({ boardRef, onSelect, onDrop }: DragOptions) {
     const current = grab.current
     if (!current || current.pointerId !== event.pointerId) return
     if (!current.moved && Math.hypot(event.clientX - current.startX, event.clientY - current.startY) < 4) return
-    // Velocidade do ponteiro (suavizada) — é o que decide se a peça gira.
     const elapsed = event.timeStamp - current.lastTime
     if (elapsed > 0) {
       const instant = (event.clientX - current.lastX) / (elapsed / 1000)

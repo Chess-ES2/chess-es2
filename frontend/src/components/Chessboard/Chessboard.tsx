@@ -19,7 +19,6 @@ const pieceValues: Record<PieceType, number> = {
   p: 1, n: 3, b: 3, r: 5, q: 9, k: 0,
 }
 
-// Minúsculas são as pretas, maiúsculas as brancas.
 const initialRows = [
   'rnbqkbnr',
   'pppppppp',
@@ -58,7 +57,6 @@ function pieceImage(color: Color, type: PieceType) {
   return `https://lichess1.org/assets/piece/cburnett/${color}${type.toUpperCase()}.svg`
 }
 
-// Reconstrói a partida desde o início (usado pelo desfazer).
 function replay(moves: Move[]) {
   const board = initialBoard()
   const pieceIds = initialPieceIds()
@@ -118,7 +116,6 @@ export default function Chessboard() {
     moveRows.push({ white: history[index], black: history[index + 1] })
   }
 
-  // Qualquer peça pode ir para qualquer casa, sem validação de regras.
   function moveTo(to: Square, from = selected) {
     if (!from || from === to || !board[from]) return
     const piece = board[from]
