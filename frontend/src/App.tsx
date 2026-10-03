@@ -8,58 +8,66 @@ function App() {
   const [mode, setMode] = useState<GameMode>('local')
   const [difficulty, setDifficulty] = useState<BotDifficulty>('medium')
 
-  const startGame = () => {
-    setPhase('playing')
-  }
-
-  const voltarParaMenu = () => {
-    setPhase('menu')
-  }
+  const startGame = () => setPhase('playing')
+  const voltarParaMenu = () => setPhase('menu')
 
   return (
     <div className="app-container">
       {phase === 'menu' ? (
-        <div className="menu-container">
-          <h1>Xadrez - ES2</h1>
-          
-          <div className="menu-group">
-            <label>Modo de Jogo</label>
-            <div className="button-group">
-              <button 
-                className={mode === 'local' ? 'active' : ''} 
-                onClick={() => setMode('local')}
-              >
-                Multijogador Local
-              </button>
-              <button 
-                className={mode === 'bot' ? 'active' : ''} 
-                onClick={() => setMode('bot')}
-              >
-                Contra o Bot
-              </button>
-            </div>
-          </div>
-
-          {mode === 'bot' && (
+        <div className="menu-wrapper">
+          <div className="menu-container">
+            <h1>Xadrez - ES2</h1>
+            
             <div className="menu-group">
-              <label>Dificuldade do Bot</label>
-              <select 
-                value={difficulty} 
-                onChange={(e) => setDifficulty(e.target.value as BotDifficulty)}
-              >
-                <option value="easy">Fácil</option>
-                <option value="medium">Médio</option>
-                <option value="hard">Difícil</option>
-              </select>
+              <label>Modo de Jogo</label>
+              <div className="button-group">
+                <button 
+                  className={mode === 'local' ? 'active' : ''} 
+                  onClick={() => setMode('local')}
+                >
+                  Multijogador Local
+                </button>
+                <button 
+                  className={mode === 'bot' ? 'active' : ''} 
+                  onClick={() => setMode('bot')}
+                >
+                  Contra o Bot
+                </button>
+              </div>
             </div>
-          )}
 
-          <button className="start-button" onClick={startGame}>
-            Iniciar Partida
-          </button>
+            {mode === 'bot' && (
+              <div className="menu-group">
+                <label>Dificuldade do Bot</label>
+                <select 
+                  value={difficulty} 
+                  onChange={(e) => setDifficulty(e.target.value as BotDifficulty)}
+                >
+                  <option value="easy">Fácil</option>
+                  <option value="medium">Médio</option>
+                  <option value="hard">Difícil</option>
+                </select>
+              </div>
+            )}
+
+            <button className="start-button" onClick={startGame}>
+              Iniciar Partida
+            </button>
+          </div>
         </div>
       ) : (
-        <Chessboard onNovaPartida={voltarParaMenu} />
+        <div className="game-view">
+          <header className="top-bar">
+            <h2>Xadrez - ES2</h2>
+            <button className="voltar-btn" onClick={voltarParaMenu}>
+              Menu Principal
+            </button>
+          </header>
+          
+          <main className="game-content">
+            <Chessboard onNovaPartida={voltarParaMenu} />
+          </main>
+        </div>
       )}
     </div>
   )

@@ -1,14 +1,62 @@
 .app-container {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
   min-height: 100vh;
   background-color: #15161a;
   color: white;
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
+/* --- Layout de Telas --- */
+.menu-wrapper, .game-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.game-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* --- Barra Superior --- */
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 32px;
+  background-color: #22242a;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 10;
+}
+
+.top-bar h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #e0e0e0;
+}
+
+.voltar-btn {
+  padding: 8px 16px;
+  background-color: transparent;
+  border: 1px solid #646464;
+  color: #a0a0a0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.voltar-btn:hover {
+  background-color: #363943;
+  color: white;
+  border-color: white;
+}
+
+/* --- Estilos do Menu Inicial --- */
 .menu-container {
   display: flex;
   flex-direction: column;
