@@ -34,7 +34,7 @@
   :root {
     --text: #9ca3af;
     --text-h: #f3f4f6;
-    --bg: #16171d;
+    --bg: #15161a;
     --border: #2e303a;
     --code-bg: #1f2028;
     --accent: #c084fc;
@@ -51,11 +51,11 @@
 }
 
 #root {
-  width: 1126px;
+  width: 100%;
   max-width: 100%;
   margin: 0 auto;
   text-align: center;
-  border-inline: 1px solid var(--border);
+  border-inline: none;
   min-height: 100svh;
   display: flex;
   flex-direction: column;
@@ -64,6 +64,7 @@
 
 body {
   margin: 0;
+  background-color: #15161a;
 }
 
 h1,
