@@ -1,0 +1,13 @@
+# Python bytecode e caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Ambientes virtuais
+venv/
+env/
+.env
+
+# Logs
+*.log
