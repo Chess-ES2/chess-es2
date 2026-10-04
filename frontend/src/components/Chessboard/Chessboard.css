@@ -57,6 +57,7 @@
 .material-advantage { margin-left: 6px; color: #8f939c; font-size: 0.8rem; }
 
 .board {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
   grid-template-rows: repeat(8, minmax(0, 1fr));

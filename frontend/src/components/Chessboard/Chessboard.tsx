@@ -3,7 +3,13 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, LayoutGroup, MotionConfig, motion } from 'motion/react'
 import { usePieceDrag } from './usePieceDrag'
 import type { Color, PieceType, Square } from './types'
+import type { GameMode, BotDifficulty } from '../../types'
 import './Chessboard.css'
+
+interface ChessboardProps {
+  mode: GameMode;
+  difficulty: BotDifficulty;
+}
 
 type Piece = { color: Color; type: PieceType }
 type Board = Partial<Record<Square, Piece>>
@@ -97,18 +103,37 @@ function PlayerBar({ color, name, pieces, advantage, active }: {
   )
 }
 
-export default function Chessboard() {
+function getArrowCoords(sq: string) {
+  const file = sq.charCodeAt(0) - 97;
+  const rank = 8 - parseInt(sq[1], 10);
+  return { x: file * 12.5 + 6.25, y: rank * 12.5 + 6.25 };
+}
+
+export default function Chessboard({ mode, difficulty }: ChessboardProps) {
   const boardId = useId()
   const boardRef = useRef<HTMLDivElement>(null)
   const [board, setBoard] = useState(initialBoard)
   const [pieceIds, setPieceIds] = useState(initialPieceIds)
-  const [gameNumber, setGameNumber] = useState(0)
   const [turn, setTurn] = useState<Color>('w')
   const [selected, setSelected] = useState<Square | null>(null)
   const [lastMove, setLastMove] = useState<Move | null>(null)
   const [captured, setCaptured] = useState<Captured>({ w: [], b: [] })
   const [history, setHistory] = useState<Move[]>([])
+  const [arrows, setArrows] = useState<Move[]>([])
+  const [drawingArrow, setDrawingArrow] = useState<Move | null>(null)
   const drag = usePieceDrag({ boardRef, onSelect: setSelected, onDrop: dropPiece })
+
+  function resetGame() {
+    drag.reset()
+    setBoard(initialBoard())
+    setPieceIds(initialPieceIds())
+    setCaptured({ w: [], b: [] })
+    setHistory([])
+    setArrows([])
+    setTurn('w')
+    setSelected(null)
+    setLastMove(null)
+  }
 
   const advantage = capturedValue(captured.w) - capturedValue(captured.b)
   const moveRows: Array<{ white: Move; black?: Move }> = []
@@ -169,17 +194,13 @@ export default function Chessboard() {
     setSelected(null)
   }
 
-  function resetGame() {
-    drag.reset()
-    setBoard(initialBoard())
-    setPieceIds(initialPieceIds())
-    setCaptured({ w: [], b: [] })
-    setHistory([])
-    setTurn('w')
-    setGameNumber((number) => number + 1)
-    setSelected(null)
-    setLastMove(null)
-  }
+  const dificuldadeLabel = {
+    easy: 'Fácil',
+    medium: 'Médio',
+    hard: 'Difícil'
+  };
+
+  const allArrows = [...arrows, drawingArrow].filter(Boolean) as Move[];
 
   return (
     <MotionConfig reducedMotion="user" transition={{ type: 'spring', duration: 0.28, bounce: 0 }}>
@@ -187,14 +208,48 @@ export default function Chessboard() {
         <div className="game-layout">
           <div className="game-main">
             <PlayerBar color="b" name="Pretas" pieces={captured.b} advantage={advantage < 0 ? -advantage : 0} active={turn === 'b'} />
-            <LayoutGroup id={`${boardId}-${gameNumber}`}>
-              <div ref={boardRef} key={gameNumber} className={`board${drag.isDragging ? ' is-dragging' : ''}`} role="group" aria-label="Tabuleiro de xadrez"
+            <LayoutGroup id={`${boardId}`}>
+              <div ref={boardRef} className={`board${drag.isDragging ? ' is-dragging' : ''}`} role="group" aria-label="Tabuleiro de xadrez"
+              onContextMenu={(event) => event.preventDefault()}
+                onPointerLeave={() => setDrawingArrow(null)}
                 onKeyDown={(event) => {
                   if (event.key === 'Escape') {
                     drag.cancel()
                     setSelected(null)
                   }
                 }}>
+                  <svg style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  pointerEvents: 'none',
+                  zIndex: 10
+                }}>
+                  {allArrows.map((arrow, i) => {
+                    const start = getArrowCoords(arrow.from);
+                    const end = getArrowCoords(arrow.to);
+                    return (
+                      <g key={`${arrow.from}-${arrow.to}-${i}`} opacity={0.8}>
+                        <defs>
+                          <marker id={`arrowhead-${i}`} markerWidth="4" markerHeight="4" refX="2.5" refY="2" orient="auto">
+                            <polygon points="0 0, 4 2, 0 4" fill="#ffaa00" />
+                          </marker>
+                        </defs>
+                        <line
+                          x1={`${start.x}%`}
+                          y1={`${start.y}%`}
+                          x2={`${end.x}%`}
+                          y2={`${end.y}%`}
+                          stroke="#ffaa00"
+                          strokeWidth="2.5%"
+                          markerEnd={`url(#arrowhead-${i})`}
+                        />
+                      </g>
+                    );
+                  })}
+                </svg>
                 {squares.map((square, index) => {
                   const piece = board[square]
                   const isDark = (Math.floor(index / 8) + index % 8) % 2 === 1
@@ -212,16 +267,40 @@ export default function Chessboard() {
                       aria-label={`${square}: ${description}`}
                       aria-pressed={isSelected}
                       onPointerDown={(event) => {
+                        if (event.button === 2) {
+                          setDrawingArrow({ from: square, to: square })
+                          return
+                        }
                         drag.preparePointer()
                         if (canDrag && piece) {
                           drag.start(event, { id: pieceIds[square]!, square, color: piece.color, type: piece.type }, selected)
                         }
                       }}
+                      onPointerEnter={() => {
+                        if (drawingArrow) {
+                          setDrawingArrow({ from: drawingArrow.from, to: square })
+                        }
+                      }}
                       onPointerMove={drag.move}
-                      onPointerUp={drag.end}
+                      onPointerUp={(event) => {
+                        if (event.button === 2) {
+                          if (drawingArrow && drawingArrow.from !== square) {
+                            setArrows((prev) => {
+                              const jaExiste = prev.some((a) => a.from === drawingArrow.from && a.to === square)
+                              return jaExiste
+                                ? prev.filter((a) => !(a.from === drawingArrow.from && a.to === square))
+                                : [...prev, { from: drawingArrow.from, to: square }]
+                            })
+                          }
+                          setDrawingArrow(null)
+                          return
+                        }
+                        drag.end(event)
+                      }}
                       onPointerCancel={drag.cancel}
                       onLostPointerCapture={drag.cancel}
                       onClick={(event) => {
+                        setArrows([])
                         if (event.detail === 0 || !drag.consumeClick()) selectSquare(square)
                       }}>
                       {index % 8 === 0 && <span className="coord coord-rank" aria-hidden="true">{square[1]}</span>}
@@ -242,7 +321,9 @@ export default function Chessboard() {
             <PlayerBar color="w" name="Brancas" pieces={captured.w} advantage={advantage > 0 ? advantage : 0} active={turn === 'w'} />
           </div>
           <aside className="game-panel" aria-label="Informações da partida">
-            <header className="panel-header">Partida</header>
+            <header className="panel-header">
+              Partida {mode === 'bot' ? `vs Computador (${dificuldadeLabel[difficulty]})` : '(Multijogador Local)'}
+            </header>
             <div className="turn-card" role="status">
               <span className={`turn-dot ${turn}`} aria-hidden="true" />
               Vez das {turn === 'w' ? 'brancas' : 'pretas'}
