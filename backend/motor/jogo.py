@@ -8,6 +8,11 @@ from motor.validacao import (
     obter_movimentos_validos,
     obter_todos_movimentos_validos,
     validar_movimento,
+    esta_em_xeque,
+    esta_em_xeque_mate,
+    esta_em_afogamento,
+    empate_por_material_insuficiente,
+    ocorre_repeticao_tripla,
 )
 
 class JogadaInvalida(Exception):
@@ -16,6 +21,8 @@ class JogadaInvalida(Exception):
 @dataclass
 class Jogo:
     tabuleiro: Tabuleiro = field(default_factory=Tabuleiro.inicial)
+    historico: list[Jogada] = field(default_factory=list)
+    historico_posicoes: list[str] = field(default_factory=list)
 
     #Construtores
     @staticmethod
@@ -28,6 +35,8 @@ class Jogo:
         #Inicia uma partida a partir de uma posição FEN.
         return Jogo(tabuleiro=Tabuleiro.de_fen(fen))
 
+    def __post_init__(self):
+        self.historico_posicoes.append(self.tabuleiro.para_fen())
 
     # Controle de turnos e consulta:
 
@@ -60,14 +69,42 @@ class Jogo:
             raise JogadaInvalida(f"O movimento de {origem} para {destino} não é válido para esta peça.")
 
 
-        # Aplica o movimento e captura no tabuleiro (EAP 3.1, 3.3, 3.5)
         self.tabuleiro.definir(origem, None)
         self.tabuleiro.definir(destino, jogada.peca)
-
-        # Alterna o turno entre os jogadores (EAP 3.6)
         self.tabuleiro.turno = self.tabuleiro.turno.oposta()
 
+        self.historico.append(jogada)
+        self.historico_posicoes.append(self.tabuleiro.para_fen())
+
         return jogada
+
+    def obter_historico_posicoes(self) -> list[str]:
+        """Retorna as posições do tabuleiro registradas durante a partida."""
+        return list(self.historico_posicoes)
+
+    def obter_historico(self) -> list[Jogada]:
+        """Retorna o histórico das jogadas realizadas."""
+        return list(self.historico)
+
+    def esta_em_xeque(self) -> bool:
+        """Verifica se o jogador do turno atual está em xeque."""
+        return esta_em_xeque(self.tabuleiro, self.tabuleiro.turno)
+
+    def esta_em_xeque_mate(self) -> bool:
+        """Verifica se o jogador do turno atual está em xeque-mate."""
+        return esta_em_xeque_mate(self.tabuleiro, self.tabuleiro.turno)
+
+    def esta_em_afogamento(self) -> bool:
+        """Verifica se o jogador do turno atual está em afogamento."""
+        return esta_em_afogamento(self.tabuleiro, self.tabuleiro.turno)
+
+    def empate_por_material_insuficiente(self) -> bool:
+        """Verifica se a partida terminou por material insuficiente."""
+        return empate_por_material_insuficiente(self.tabuleiro)
+
+    def ocorre_repeticao_tripla(self) -> bool:
+        """Verifica se alguma posição ocorreu pelo menos três vezes."""
+        return ocorre_repeticao_tripla(self.historico_posicoes)
 
     def __repr__(self) -> str:
         turno_str = "Brancas" if self.turno_atual() == Cor.BRANCA else "Pretas"
