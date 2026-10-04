@@ -9,6 +9,7 @@ import './Chessboard.css'
 interface ChessboardProps {
   mode: GameMode;
   difficulty: BotDifficulty;
+  corJogador: Color;
 }
 
 type Piece = { color: Color; type: PieceType }
@@ -84,11 +85,11 @@ function capturedValue(pieces: Piece[]) {
   return pieces.reduce((total, piece) => total + pieceValues[piece.type], 0)
 }
 
-function PlayerBar({ color, name, pieces, advantage, active }: {
-  color: Color; name: string; pieces: Piece[]; advantage: number; active: boolean
+function PlayerBar({ color, name, pieces, advantage, active, position }: {
+  color: Color; name: string; pieces: Piece[]; advantage: number; active: boolean; position: 'top' | 'bottom'
 }) {
   return (
-    <div className={['player-bar', color === 'b' ? 'top' : 'bottom', active && 'active'].filter(Boolean).join(' ')}>
+    <div className={['player-bar', position, active && 'active'].filter(Boolean).join(' ')}>
       <span className="player-avatar">
         <img src={pieceImage(color, 'k')} alt="" />
       </span>
@@ -103,13 +104,16 @@ function PlayerBar({ color, name, pieces, advantage, active }: {
   )
 }
 
-function getArrowCoords(sq: string) {
+function getArrowCoords(sq: string, virado: boolean) {
   const file = sq.charCodeAt(0) - 97;
   const rank = 8 - parseInt(sq[1], 10);
-  return { x: file * 12.5 + 6.25, y: rank * 12.5 + 6.25 };
+  const x = file * 12.5 + 6.25;
+  const y = rank * 12.5 + 6.25;
+  // Com o tabuleiro virado, as setas são espelhadas nos dois eixos.
+  return virado ? { x: 100 - x, y: 100 - y } : { x, y };
 }
 
-export default function Chessboard({ mode, difficulty }: ChessboardProps) {
+export default function Chessboard({ mode, difficulty, corJogador }: ChessboardProps) {
   const boardId = useId()
   const boardRef = useRef<HTMLDivElement>(null)
   const [board, setBoard] = useState(initialBoard)
@@ -135,7 +139,15 @@ export default function Chessboard({ mode, difficulty }: ChessboardProps) {
     setLastMove(null)
   }
 
-  const advantage = capturedValue(captured.w) - capturedValue(captured.b)
+  function advantageFor(cor: Color) {
+    const outra: Color = cor === 'w' ? 'b' : 'w'
+    return capturedValue(captured[cor]) - capturedValue(captured[outra])
+  }
+
+  const virado = corJogador === 'b'
+  const corTopo: Color = virado ? 'w' : 'b'
+  const squaresVisiveis = virado ? [...squares].reverse() : squares
+
   const moveRows: Array<{ white: Move; black?: Move }> = []
   for (let index = 0; index < history.length; index += 2) {
     moveRows.push({ white: history[index], black: history[index + 1] })
@@ -207,7 +219,7 @@ export default function Chessboard({ mode, difficulty }: ChessboardProps) {
       <section className="chess-game" aria-label="Partida de xadrez">
         <div className="game-layout">
           <div className="game-main">
-            <PlayerBar color="b" name="Pretas" pieces={captured.b} advantage={advantage < 0 ? -advantage : 0} active={turn === 'b'} />
+            <PlayerBar position="top" color={corTopo} name={corTopo === 'w' ? 'Brancas' : 'Pretas'} pieces={captured[corTopo]} advantage={Math.max(0, advantageFor(corTopo))} active={turn === corTopo} />
             <LayoutGroup id={`${boardId}`}>
               <div ref={boardRef} className={`board${drag.isDragging ? ' is-dragging' : ''}`} role="group" aria-label="Tabuleiro de xadrez"
               onContextMenu={(event) => event.preventDefault()}
@@ -228,8 +240,8 @@ export default function Chessboard({ mode, difficulty }: ChessboardProps) {
                   zIndex: 10
                 }}>
                   {allArrows.map((arrow, i) => {
-                    const start = getArrowCoords(arrow.from);
-                    const end = getArrowCoords(arrow.to);
+                    const start = getArrowCoords(arrow.from, virado);
+                    const end = getArrowCoords(arrow.to, virado);
                     return (
                       <g key={`${arrow.from}-${arrow.to}-${i}`} opacity={0.8}>
                         <defs>
@@ -250,7 +262,7 @@ export default function Chessboard({ mode, difficulty }: ChessboardProps) {
                     );
                   })}
                 </svg>
-                {squares.map((square, index) => {
+                {squaresVisiveis.map((square, index) => {
                   const piece = board[square]
                   const isDark = (Math.floor(index / 8) + index % 8) % 2 === 1
                   const isSelected = selected === square
@@ -318,7 +330,7 @@ export default function Chessboard({ mode, difficulty }: ChessboardProps) {
                 })}
               </div>
             </LayoutGroup>
-            <PlayerBar color="w" name="Brancas" pieces={captured.w} advantage={advantage > 0 ? advantage : 0} active={turn === 'w'} />
+            <PlayerBar position="bottom" color={corJogador} name={corJogador === 'w' ? 'Brancas' : 'Pretas'} pieces={captured[corJogador]} advantage={Math.max(0, advantageFor(corJogador))} active={turn === corJogador} />
           </div>
           <aside className="game-panel" aria-label="Informações da partida">
             <header className="panel-header">
