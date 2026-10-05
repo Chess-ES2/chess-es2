@@ -107,6 +107,28 @@ class TestAvaliar:
     def test_posicao_inicial(self):
         assert avaliar(Tabuleiro.inicial()) == 0
 
+    def test_soma_material_e_posicional(self):
+        tab = Tabuleiro.de_fen(FEN_SEM_DAMA_PRETA)
+        assert avaliar(tab) == avaliar_material(tab) + avaliar_posicional(tab)
+
+    def test_posicao_influencia_a_nota(self):
+        #Mesmo material, casas diferentes: o cavalo central deve render nota maior.
+        centro = tabuleiro_com(("e4", TipoPeca.CAVALO, Cor.BRANCA))
+        borda  = tabuleiro_com(("a1", TipoPeca.CAVALO, Cor.BRANCA))
+        assert avaliar_material(centro) == avaliar_material(borda)
+        assert avaliar(centro) > avaliar(borda)
+
+    def test_material_pesa_mais_que_a_posicao(self):
+        #Uma dama no pior canto ainda vale muito mais que nenhuma dama.
+        com_dama_no_canto = tabuleiro_com(("a1", TipoPeca.DAMA, Cor.BRANCA))
+        sem_dama = Tabuleiro()
+        assert avaliar(com_dama_no_canto) > avaliar(sem_dama)
+
+    def test_simetria_da_nota_total(self):
+        brancas = tabuleiro_com(("e4", TipoPeca.CAVALO, Cor.BRANCA), ("d1", TipoPeca.DAMA, Cor.BRANCA))
+        pretas  = tabuleiro_com(("e5", TipoPeca.CAVALO, Cor.PRETA),  ("d8", TipoPeca.DAMA, Cor.PRETA))
+        assert avaliar(brancas) == -avaliar(pretas)
+
     def test_nao_altera_o_tabuleiro(self):
         tab = Tabuleiro.inicial()
         fen_antes = tab.para_fen()

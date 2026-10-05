@@ -35,5 +35,5 @@ def avaliar_posicional(tabuleiro: Tabuleiro) -> int:
 
 
 def avaliar(tabuleiro: Tabuleiro) -> int:
-    #Nota da posição. Por enquanto considera apenas o material.
-    return avaliar_material(tabuleiro)
+    #Nota da posição: material + bônus de posição das peças.
+    return avaliar_material(tabuleiro) + avaliar_posicional(tabuleiro)
