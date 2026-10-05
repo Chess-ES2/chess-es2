@@ -68,6 +68,10 @@
   box-shadow: 0 12px 32px rgb(0 0 0 / 55%);
 }
 
+.board-area {
+  position: relative;
+}
+
 .square {
   position: relative;
   display: flex;
@@ -91,6 +95,22 @@
 .square.draggable-square { cursor: grab; touch-action: none; }
 .board.is-dragging .square { cursor: grabbing; }
 .square.drop-target { outline: 3px solid rgb(255 255 255 / 75%); outline-offset: -3px; }
+
+.square.valid-move::after {
+  content: '';
+  position: absolute;
+  width: 26%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgb(247 236 116 / 55%);
+  pointer-events: none;
+}
+
+.square.valid-move:has(.piece-img)::after {
+  width: 86%;
+  background: none;
+  border: 3px solid rgb(247 236 116 / 55%);
+}
 
 .coord {
   position: absolute;
@@ -141,6 +161,7 @@
   overflow: hidden;
   border-radius: 8px;
   background: #1e2025;
+  contain: size;
 }
 
 .panel-header {
@@ -217,6 +238,7 @@
 
 .panel-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 12px;
   border-top: 1px solid #33363d;
@@ -247,11 +269,16 @@
 .action-button:focus-visible { outline: 2px solid #f7ec74; outline-offset: 2px; }
 .action-button.primary { background: #3c7a4e; }
 .action-button.primary:hover { background: #468c5b; }
+.action-button.ativa { background: #3c6b4a; }
+.action-button.ativa:hover { background: #468c5b; }
+
+.panel-actions .action-button { font-size: 0.78rem; gap: 6px; white-space: nowrap; }
+.panel-actions .action-button.avaliacao { flex: 0 0 46px; }
 
 @media (max-width: 860px) {
   .game-layout { flex-direction: column; }
   .game-main { flex: none; width: 100%; }
-  .game-panel { flex: none; width: 100%; min-width: 0; }
+  .game-panel { flex: none; width: 100%; min-width: 0; contain: none; }
   .move-list { max-height: 260px; }
 }
 

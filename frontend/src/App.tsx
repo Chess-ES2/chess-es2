@@ -115,7 +115,13 @@ function App() {
             </header>
 
             <main className="game-content">
-              <Chessboard mode={mode} difficulty={difficulty} corJogador={corJogador} />
+              <Chessboard
+                mode={mode}
+                difficulty={difficulty}
+                corJogador={corJogador}
+                onVoltarMenu={voltarParaMenu}
+                onTrocarLados={() => setCorJogador((cor) => (cor === 'w' ? 'b' : 'w'))}
+              />
             </main>
           </div>
         )}

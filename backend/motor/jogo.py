@@ -20,11 +20,82 @@ from motor.validacao import (
 class JogadaInvalida(Exception):
     """Lançada quando uma jogada inválida ou fora de turno é tentada."""
 
+def aplicar_jogada(tabuleiro: Tabuleiro, jogada: Jogada) -> None:
+    """Aplica uma jogada já validada no tabuleiro e alterna o turno."""
+    peca = jogada.peca
+    origem, destino = jogada.origem, jogada.destino
+
+    tabuleiro.definir(origem, None)
+
+    if jogada.promocao:
+        tabuleiro.definir(destino, Peca(tipo=jogada.promocao, cor=peca.cor))
+    else:
+        tabuleiro.definir(destino, peca)
+
+    if jogada.e_en_passant:
+        col_dest, _ = coordenadas(destino)
+        _, lin_orig = coordenadas(origem)
+        casa_capturada = de_coordenadas(col_dest, lin_orig)
+        if casa_capturada:
+            tabuleiro.definir(casa_capturada, None)
+
+    if jogada.e_roque:
+        if destino == "g1":
+            tabuleiro.definir("h1", None)
+            tabuleiro.definir("f1", Peca(TipoPeca.TORRE, Cor.BRANCA))
+        elif destino == "c1":
+            tabuleiro.definir("a1", None)
+            tabuleiro.definir("d1", Peca(TipoPeca.TORRE, Cor.BRANCA))
+        elif destino == "g8":
+            tabuleiro.definir("h8", None)
+            tabuleiro.definir("f8", Peca(TipoPeca.TORRE, Cor.PRETA))
+        elif destino == "c8":
+            tabuleiro.definir("a8", None)
+            tabuleiro.definir("d8", Peca(TipoPeca.TORRE, Cor.PRETA))
+
+    # Atualiza perda dos direitos de roque
+    if peca.tipo == TipoPeca.REI:
+        if peca.cor == Cor.BRANCA:
+            tabuleiro.direitos_roque["K"] = False
+            tabuleiro.direitos_roque["Q"] = False
+        else:
+            tabuleiro.direitos_roque["k"] = False
+            tabuleiro.direitos_roque["q"] = False
+    elif peca.tipo == TipoPeca.TORRE:
+        if origem == "h1":
+            tabuleiro.direitos_roque["K"] = False
+        elif origem == "a1":
+            tabuleiro.direitos_roque["Q"] = False
+        elif origem == "h8":
+            tabuleiro.direitos_roque["k"] = False
+        elif origem == "a8":
+            tabuleiro.direitos_roque["q"] = False
+
+    if destino == "h1":
+        tabuleiro.direitos_roque["K"] = False
+    elif destino == "a1":
+        tabuleiro.direitos_roque["Q"] = False
+    elif destino == "h8":
+        tabuleiro.direitos_roque["k"] = False
+    elif destino == "a8":
+        tabuleiro.direitos_roque["q"] = False
+
+    # Atualiza en passant para o próximo lance
+    col_orig, lin_orig = coordenadas(origem)
+    _, lin_dest = coordenadas(destino)
+    if peca.tipo == TipoPeca.PEAO and abs(lin_dest - lin_orig) == 2:
+        tabuleiro.casa_en_passant = de_coordenadas(col_orig, (lin_orig + lin_dest) // 2)
+    else:
+        tabuleiro.casa_en_passant = None
+
+    tabuleiro.turno = tabuleiro.turno.oposta()
+
 @dataclass
 class Jogo:
     tabuleiro: Tabuleiro = field(default_factory=Tabuleiro.inicial)
     historico: list[Jogada] = field(default_factory=list)
     historico_posicoes: list[str] = field(default_factory=list)
+    pilha_tabuleiros: list[Tabuleiro] = field(default_factory=list)
 
     #Construtores
     @staticmethod
@@ -72,73 +143,8 @@ class Jogo:
                 raise JogadaInvalida(f"É a vez das {cor_atual}. A peça em {origem} pertence ao adversário.")
             raise JogadaInvalida(f"O movimento de {origem} para {destino} não é válido para esta peça.")
 
-        peca = jogada.peca
-
-        self.tabuleiro.definir(origem, None)
-
-
-        if jogada.promocao:
-            self.tabuleiro.definir(destino, Peca(tipo=jogada.promocao, cor=peca.cor))
-        else:
-            self.tabuleiro.definir(destino, peca)
-
-        if jogada.e_en_passant:
-            col_dest, _ = coordenadas(destino)
-            _, lin_orig = coordenadas(origem)
-            casa_capturada = de_coordenadas(col_dest, lin_orig)
-            if casa_capturada:
-                self.tabuleiro.definir(casa_capturada, None)
-
-        if jogada.e_roque:
-            if destino == "g1":
-                self.tabuleiro.definir("h1", None)
-                self.tabuleiro.definir("f1", Peca(TipoPeca.TORRE, Cor.BRANCA))
-            elif destino == "c1":
-                self.tabuleiro.definir("a1", None)
-                self.tabuleiro.definir("d1", Peca(TipoPeca.TORRE, Cor.BRANCA))
-            elif destino == "g8":
-                self.tabuleiro.definir("h8", None)
-                self.tabuleiro.definir("f8", Peca(TipoPeca.TORRE, Cor.PRETA))
-            elif destino == "c8":
-                self.tabuleiro.definir("a8", None)
-                self.tabuleiro.definir("d8", Peca(TipoPeca.TORRE, Cor.PRETA))
-
-        # Atualiza perda dos direitos de roque
-        if peca.tipo == TipoPeca.REI:
-            if peca.cor == Cor.BRANCA:
-                self.tabuleiro.direitos_roque["K"] = False
-                self.tabuleiro.direitos_roque["Q"] = False
-            else:
-                self.tabuleiro.direitos_roque["k"] = False
-                self.tabuleiro.direitos_roque["q"] = False
-        elif peca.tipo == TipoPeca.TORRE:
-            if origem == "h1":
-                self.tabuleiro.direitos_roque["K"] = False
-            elif origem == "a1":
-                self.tabuleiro.direitos_roque["Q"] = False
-            elif origem == "h8":
-                self.tabuleiro.direitos_roque["k"] = False
-            elif origem == "a8":
-                self.tabuleiro.direitos_roque["q"] = False
-
-        if destino == "h1":
-            self.tabuleiro.direitos_roque["K"] = False
-        elif destino == "a1":
-            self.tabuleiro.direitos_roque["Q"] = False
-        elif destino == "h8":
-            self.tabuleiro.direitos_roque["k"] = False
-        elif destino == "a8":
-            self.tabuleiro.direitos_roque["q"] = False
-
-        # Atualiza en passant para o próximo lance
-        col_orig, lin_orig = coordenadas(origem)
-        col_dest, lin_dest = coordenadas(destino)
-        if peca.tipo == TipoPeca.PEAO and abs(lin_dest - lin_orig) == 2:
-            self.tabuleiro.casa_en_passant = de_coordenadas(col_orig, (lin_orig + lin_dest) // 2)
-        else:
-            self.tabuleiro.casa_en_passant = None
-
-        self.tabuleiro.turno = self.tabuleiro.turno.oposta()
+        self.pilha_tabuleiros.append(self.tabuleiro.copiar())
+        aplicar_jogada(self.tabuleiro, jogada)
 
         self.historico.append(jogada)
         self.historico_posicoes.append(self.tabuleiro.para_fen())
@@ -153,6 +159,15 @@ class Jogo:
     def obter_historico(self) -> list[Jogada]:
         """Retorna o histórico das jogadas realizadas."""
         return list(self.historico)
+
+    def desfazer(self) -> Jogada | None:
+        """Desfaz a última jogada e devolve o estado anterior do tabuleiro."""
+        if not self.historico:
+            return None
+        jogada = self.historico.pop()
+        self.historico_posicoes.pop()
+        self.tabuleiro = self.pilha_tabuleiros.pop()
+        return jogada
 
     def esta_em_xeque(self) -> bool:
         """Verifica se o jogador do turno atual está em xeque."""
