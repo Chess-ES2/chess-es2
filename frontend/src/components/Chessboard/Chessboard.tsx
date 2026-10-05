@@ -4,10 +4,12 @@ import { AnimatePresence, LayoutGroup, MotionConfig, motion } from 'motion/react
 import { usePieceDrag } from './usePieceDrag'
 import Promotion from './Promotion'
 import Checkmate from './Checkmate'
+import EvalBar from './EvalBar'
 import { centroDaCasa, pieceImage } from './tabuleiro'
 import {
   desfazer,
   jogar,
+  jogarBot,
   movimentos,
   novaPartida,
   type EstadoPartida,
@@ -141,6 +143,10 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
   const [jogadas, setJogadas] = useState<JogadaServidor[]>([])
   const [promocao, setPromocao] = useState<{ origem: Square; destino: Square } | null>(null)
   const [xequeMate, setXequeMate] = useState(false)
+  const [cp, setCp] = useState(0)
+  const [mostrarAvaliacao, setMostrarAvaliacao] = useState(
+    () => localStorage.getItem('avaliacao') === 'on',
+  )
   const [ultimosMovimentos, setUltimosMovimentos] = useState<{
     casa: Square
     destinos: Square[]
@@ -170,6 +176,7 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
         setBoard(boardFromFen(estado.fen))
         setTurn(estado.turno === 'brancas' ? 'w' : 'b')
         setXequeMate(estado.xeque_mate)
+        setCp(estado.cp)
       })
       .catch(() => setPartidaId(null))
     return () => {
@@ -197,12 +204,41 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
     }
   }, [partidaId, selected])
 
+  useEffect(() => {
+    if (mode !== 'bot' || !partidaId || xequeMate) return
+    if (turn === corJogador) return
+    let ativo = true
+    const timer = setTimeout(() => {
+      jogarBot(partidaId, difficulty)
+        .then(({ jogada, estado }) => {
+          if (!ativo) return
+          setJogadas((atuais) => [...atuais, jogada])
+          setBoard(boardFromFen(estado.fen))
+          setTurn(estado.turno === 'brancas' ? 'w' : 'b')
+          setXequeMate(estado.xeque_mate)
+          setCp(estado.cp)
+        })
+        .catch(() => {})
+    }, 400)
+    return () => {
+      ativo = false
+      clearTimeout(timer)
+    }
+  }, [mode, partidaId, turn, corJogador, xequeMate, difficulty])
+
   const destinos = ultimosMovimentos?.casa === selected ? ultimosMovimentos.destinos : []
 
   function aplicarEstado(estado: EstadoPartida) {
     setBoard(boardFromFen(estado.fen))
     setTurn(estado.turno === 'brancas' ? 'w' : 'b')
     setXequeMate(estado.xeque_mate)
+    setCp(estado.cp)
+  }
+
+  function alternarAvaliacao() {
+    const proximo = !mostrarAvaliacao
+    setMostrarAvaliacao(proximo)
+    localStorage.setItem('avaliacao', proximo ? 'on' : 'off')
   }
 
   async function resetGame() {
@@ -230,6 +266,10 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
   const virado = corJogador === 'b'
   const corTopo: Color = virado ? 'w' : 'b'
   const squaresVisiveis = virado ? [...squares].reverse() : squares
+  const podeMover = (cor: Color) => cor === turn && (mode === 'local' || cor === corJogador)
+  const nomeDaCor = (cor: Color) => (mode === 'bot' && cor !== corJogador
+    ? 'Computador'
+    : cor === 'w' ? 'Brancas' : 'Pretas')
 
   const moveRows: Array<{ white: Move; black?: Move }> = []
   for (let index = 0; index < history.length; index += 2) {
@@ -298,7 +338,7 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
       void tentarJogada(selected, square)
       return
     }
-    setSelected(peca?.color === turn ? square : null)
+    setSelected(peca && podeMover(peca.color) ? square : null)
   }
 
   async function undoMove() {
@@ -328,8 +368,12 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
       <section className="chess-game" aria-label="Partida de xadrez">
         <div className="game-layout">
           <div className="game-main">
-            <PlayerBar position="top" color={corTopo} name={corTopo === 'w' ? 'Brancas' : 'Pretas'} pieces={captured[corTopo]} advantage={Math.max(0, advantageFor(corTopo))} active={turn === corTopo} />
-            <LayoutGroup id={`${boardId}`}>
+            <PlayerBar position="top" color={corTopo} name={nomeDaCor(corTopo)} pieces={captured[corTopo]} advantage={Math.max(0, advantageFor(corTopo))} active={turn === corTopo} />
+            <div className="board-area">
+              {mostrarAvaliacao && (
+                <EvalBar cp={cp} turno={turn} virado={virado} xequeMate={xequeMate} />
+              )}
+              <LayoutGroup id={`${boardId}`}>
               <div ref={boardRef} className={`board${drag.isDragging ? ' is-dragging' : ''}`} role="group" aria-label="Tabuleiro de xadrez"
               onContextMenu={(event) => event.preventDefault()}
                 onPointerLeave={() => setDrawingArrow(null)}
@@ -381,7 +425,7 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
                   const isDark = (Math.floor(index / 8) + index % 8) % 2 === 1
                   const isSelected = selected === square
                   const isLastMove = lastMove?.from === square || lastMove?.to === square
-                  const canDrag = piece?.color === turn
+                  const canDrag = piece ? podeMover(piece.color) : false
                   const isDestino = destinos.includes(square)
                   const description = piece ? `${pieceNames[piece.type]} (${piece.color === 'w' ? 'brancas' : 'pretas'})` : 'vazia'
 
@@ -454,8 +498,9 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
                   />
                 )}
               </div>
-            </LayoutGroup>
-            <PlayerBar position="bottom" color={corJogador} name={corJogador === 'w' ? 'Brancas' : 'Pretas'} pieces={captured[corJogador]} advantage={Math.max(0, advantageFor(corJogador))} active={turn === corJogador} />
+              </LayoutGroup>
+            </div>
+            <PlayerBar position="bottom" color={corJogador} name={nomeDaCor(corJogador)} pieces={captured[corJogador]} advantage={Math.max(0, advantageFor(corJogador))} active={turn === corJogador} />
           </div>
           <aside className="game-panel" aria-label="Informações da partida">
             <header className="panel-header">
@@ -489,6 +534,18 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
                   <path d="M3 3v5h5" />
                 </svg>
                 Desfazer
+              </button>
+              <button
+                type="button"
+                className={`action-button avaliacao${mostrarAvaliacao ? ' ativa' : ''}`}
+                aria-pressed={mostrarAvaliacao}
+                aria-label="Avaliação"
+                title="Mostrar avaliação da posição"
+                onClick={alternarAvaliacao}
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                  <path d="M5 20V11M12 20V5M19 20v-6" />
+                </svg>
               </button>
               <button type="button" className="action-button primary" onClick={resetGame}>
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

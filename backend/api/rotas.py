@@ -4,6 +4,8 @@ from __future__ import annotations
 import uuid
 from flask import Flask, jsonify, request, abort
 
+from ia.avaliacao import avaliar
+from ia.busca import PROFUNDIDADES, melhor_jogada
 from motor.jogo import Jogo, JogadaInvalida
 
 app = Flask(__name__)
@@ -23,6 +25,7 @@ def _estado_jogo(jogo: Jogo, id_partida: str) -> dict:
         "fen":   jogo.tabuleiro.para_fen(),
         "turno": "brancas" if jogo.turno_atual().value == "w" else "pretas",
         "xeque_mate": jogo.esta_em_xeque_mate(),
+        "cp": avaliar(jogo.tabuleiro),
     }
 
 @app.post("/partida/nova")
@@ -108,6 +111,23 @@ def desfazer_jogada(id_partida: str):
 
     return jsonify({
         "jogada": jogada.para_dict(),
+        "estado": _estado_jogo(jogo, id_partida),
+    })
+
+@app.post("/partida/<id_partida>/bot")
+def jogada_bot(id_partida: str):
+    jogo = _obter_partida(id_partida)
+    dados = request.get_json(silent=True) or {}
+    profundidade = PROFUNDIDADES.get(dados.get("dificuldade"), PROFUNDIDADES["medium"])
+
+    jogada = melhor_jogada(jogo.tabuleiro, profundidade)
+    if jogada is None:
+        abort(400, description="Não há jogadas disponíveis para o bot.")
+
+    aplicada = jogo.fazer_jogada(jogada.origem, jogada.destino, jogada.promocao)
+
+    return jsonify({
+        "jogada": aplicada.para_dict(),
         "estado": _estado_jogo(jogo, id_partida),
     })
 

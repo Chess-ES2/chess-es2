@@ -1,0 +1,64 @@
+.eval-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 100%;
+  width: 18px;
+  margin-right: 10px;
+  border: 1px solid #33363d;
+  border-radius: 5px;
+  background: #15161a;
+}
+
+.eval-bar-parte {
+  width: 100%;
+  transition: height 0.35s ease;
+}
+
+.eval-bar-parte:first-of-type {
+  border-radius: 4px 4px 0 0;
+}
+
+.eval-bar-parte:last-of-type {
+  border-radius: 0 0 4px 4px;
+}
+
+.eval-bar-parte.branca {
+  background: #f4f5f7;
+}
+
+.eval-bar-parte.preta {
+  background: #23262c;
+}
+
+.eval-bar-valor {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: #15161a;
+  color: #e8eaf0;
+  font-size: 0.62rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 50%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eval-bar-parte {
+    transition: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .eval-bar {
+    right: auto;
+    left: 4px;
+    width: 10px;
+    margin-right: 0;
+    border-radius: 3px;
+    z-index: 3;
+  }
+}

@@ -68,6 +68,10 @@
   box-shadow: 0 12px 32px rgb(0 0 0 / 55%);
 }
 
+.board-area {
+  position: relative;
+}
+
 .square {
   position: relative;
   display: flex;
@@ -233,6 +237,7 @@
 
 .panel-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 12px;
   border-top: 1px solid #33363d;
@@ -263,6 +268,11 @@
 .action-button:focus-visible { outline: 2px solid #f7ec74; outline-offset: 2px; }
 .action-button.primary { background: #3c7a4e; }
 .action-button.primary:hover { background: #468c5b; }
+.action-button.ativa { background: #3c6b4a; }
+.action-button.ativa:hover { background: #468c5b; }
+
+.panel-actions .action-button { font-size: 0.78rem; gap: 6px; white-space: nowrap; }
+.panel-actions .action-button.avaliacao { flex: 0 0 46px; }
 
 @media (max-width: 860px) {
   .game-layout { flex-direction: column; }

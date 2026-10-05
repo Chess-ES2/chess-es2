@@ -3,6 +3,7 @@ export type EstadoPartida = {
   fen: string
   turno: 'brancas' | 'pretas'
   xeque_mate: boolean
+  cp: number
 }
 
 export type JogadaServidor = {
@@ -42,6 +43,10 @@ export function jogar(id: string, origem: string, destino: string, promocao?: st
 
 export function desfazer(id: string) {
   return requisitar<RespostaJogada>(`/partida/${id}/desfazer`, enviar({}))
+}
+
+export function jogarBot(id: string, dificuldade: string) {
+  return requisitar<RespostaJogada>(`/partida/${id}/bot`, enviar({ dificuldade }))
 }
 
 export function movimentos(id: string, casa: string) {
