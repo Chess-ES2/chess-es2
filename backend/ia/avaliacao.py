@@ -25,7 +25,8 @@ def avaliar_posicional(tabuleiro: Tabuleiro) -> int:
         if tabela is None:
             continue
         coluna, linha = coordenadas(casa)
-        # A tabela começa na fileira 8: as brancas leem de baixo para cima, as pretas espelham.
+        # "linha" 0 é a fileira 1, mas a tabela começa na fileira 8:
+        # por isso as brancas usam 7 - linha e as pretas usam linha (tabela espelhada).
         if peca.cor == Cor.BRANCA:
             nota += tabela[7 - linha][coluna]
         else:

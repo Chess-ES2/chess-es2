@@ -1,6 +1,7 @@
 from motor.peca import Cor, Peca, TipoPeca
 from motor.tabuleiro import Tabuleiro
 from ia.avaliacao import avaliar, avaliar_material, avaliar_posicional
+from ia.tabelas import BONUS_POSICAO, VALOR_PECA
 
 # Posição inicial sem a dama preta / sem a dama branca
 FEN_SEM_DAMA_PRETA  = "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w"
@@ -31,6 +32,18 @@ def tabuleiro_com(*pecas: tuple[str, TipoPeca, Cor]) -> Tabuleiro:
     return tab
 
 
+class TestTabelas:
+    def test_toda_peca_tem_valor_e_bonus(self):
+        for tipo in TipoPeca:
+            assert tipo in VALOR_PECA
+            assert tipo in BONUS_POSICAO
+
+    def test_tabelas_sao_8x8(self):
+        for tabela in BONUS_POSICAO.values():
+            assert len(tabela) == 8
+            assert all(len(linha) == 8 for linha in tabela)
+
+
 class TestPosicional:
     def test_posicao_inicial_equilibrada(self):
         assert avaliar_posicional(Tabuleiro.inicial()) == 0
@@ -44,6 +57,33 @@ class TestPosicional:
         avancado = tabuleiro_com(("e5", TipoPeca.PEAO, Cor.BRANCA))
         inicial  = tabuleiro_com(("e2", TipoPeca.PEAO, Cor.BRANCA))
         assert avaliar_posicional(avancado) > avaliar_posicional(inicial)
+
+    def test_bispo_no_centro_vale_mais_que_no_canto(self):
+        centro = tabuleiro_com(("d4", TipoPeca.BISPO, Cor.BRANCA))
+        canto  = tabuleiro_com(("a1", TipoPeca.BISPO, Cor.BRANCA))
+        assert avaliar_posicional(centro) > avaliar_posicional(canto)
+
+    def test_torre_na_setima_fileira_vale_mais_que_no_meio(self):
+        setima = tabuleiro_com(("e7", TipoPeca.TORRE, Cor.BRANCA))
+        meio   = tabuleiro_com(("e4", TipoPeca.TORRE, Cor.BRANCA))
+        assert avaliar_posicional(setima) > avaliar_posicional(meio)
+
+    def test_dama_no_centro_vale_mais_que_no_canto(self):
+        centro = tabuleiro_com(("e4", TipoPeca.DAMA, Cor.BRANCA))
+        canto  = tabuleiro_com(("a1", TipoPeca.DAMA, Cor.BRANCA))
+        assert avaliar_posicional(centro) > avaliar_posicional(canto)
+
+    def test_rei_protegido_vale_mais_que_no_centro(self):
+        protegido = tabuleiro_com(("g1", TipoPeca.REI, Cor.BRANCA))
+        centro    = tabuleiro_com(("e4", TipoPeca.REI, Cor.BRANCA))
+        assert avaliar_posicional(protegido) > avaliar_posicional(centro)
+
+    def test_simetria_de_todas_as_pecas(self):
+        #Cada peça branca em uma casa deve valer o oposto da peça preta na casa espelhada.
+        for tipo in TipoPeca:
+            brancas = tabuleiro_com(("b2", tipo, Cor.BRANCA), ("f4", tipo, Cor.BRANCA))
+            pretas  = tabuleiro_com(("b7", tipo, Cor.PRETA),  ("f5", tipo, Cor.PRETA))
+            assert avaliar_posicional(brancas) == -avaliar_posicional(pretas)
 
     def test_simetria_cavalo(self):
         #e4 para as brancas é a casa espelhada de e5 para as pretas.
