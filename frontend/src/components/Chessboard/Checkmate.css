@@ -1,0 +1,147 @@
+.checkmate-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(10 12 16 / 62%);
+  backdrop-filter: blur(3px);
+}
+
+.checkmate-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+  max-width: 400px;
+  padding: 40px;
+  border-radius: 12px;
+  background: #22242a;
+  box-shadow: 0 8px 16px rgb(0 0 0 / 40%);
+  text-align: center;
+}
+
+.checkmate-card h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.checkmate-vencedor {
+  margin: -14px 0 0;
+  color: #a0a0a0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.checkmate-acoes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.checkmate-linha {
+  display: flex;
+  gap: 10px;
+}
+
+.checkmate-secundario {
+  flex: 1;
+  padding: 12px 10px;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  background: #2b2d35;
+  color: #e0e0e0;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.checkmate-secundario:hover {
+  background: #363943;
+}
+
+.checkmate-revanche {
+  flex: 1;
+  padding: 14px;
+  border: none;
+  border-radius: 6px;
+  background: #4a6c40;
+  color: white;
+  font-size: 1.05rem;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 4px 6px rgb(0 0 0 / 20%);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.checkmate-revanche:hover {
+  background: #58804c;
+}
+
+.checkmate-revanche:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 20%);
+}
+
+.checkmate-dica {
+  position: relative;
+  display: flex;
+}
+
+.checkmate-ajuda {
+  width: 48px;
+  border: 2px solid #3a3e46;
+  border-radius: 6px;
+  background: #2b2d35;
+  color: #a0a0a0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: help;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.checkmate-ajuda:hover,
+.checkmate-ajuda:focus-visible {
+  color: white;
+  border-color: #649057;
+}
+
+.checkmate-dica-texto {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  width: max-content;
+  max-width: 220px;
+  padding: 8px 10px;
+  border: 1px solid #3a3e46;
+  border-radius: 6px;
+  background: #2b2d35;
+  color: #e0e0e0;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.checkmate-dica:hover .checkmate-dica-texto,
+.checkmate-dica:focus-within .checkmate-dica-texto {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .checkmate-secundario,
+  .checkmate-revanche,
+  .checkmate-ajuda,
+  .checkmate-dica-texto {
+    transition: none;
+  }
+}

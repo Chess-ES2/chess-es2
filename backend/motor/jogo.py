@@ -25,6 +25,7 @@ class Jogo:
     tabuleiro: Tabuleiro = field(default_factory=Tabuleiro.inicial)
     historico: list[Jogada] = field(default_factory=list)
     historico_posicoes: list[str] = field(default_factory=list)
+    pilha_tabuleiros: list[Tabuleiro] = field(default_factory=list)
 
     #Construtores
     @staticmethod
@@ -72,6 +73,7 @@ class Jogo:
                 raise JogadaInvalida(f"É a vez das {cor_atual}. A peça em {origem} pertence ao adversário.")
             raise JogadaInvalida(f"O movimento de {origem} para {destino} não é válido para esta peça.")
 
+        self.pilha_tabuleiros.append(self.tabuleiro.copiar())
         peca = jogada.peca
 
         self.tabuleiro.definir(origem, None)
@@ -153,6 +155,15 @@ class Jogo:
     def obter_historico(self) -> list[Jogada]:
         """Retorna o histórico das jogadas realizadas."""
         return list(self.historico)
+
+    def desfazer(self) -> Jogada | None:
+        """Desfaz a última jogada e devolve o estado anterior do tabuleiro."""
+        if not self.historico:
+            return None
+        jogada = self.historico.pop()
+        self.historico_posicoes.pop()
+        self.tabuleiro = self.pilha_tabuleiros.pop()
+        return jogada
 
     def esta_em_xeque(self) -> bool:
         """Verifica se o jogador do turno atual está em xeque."""

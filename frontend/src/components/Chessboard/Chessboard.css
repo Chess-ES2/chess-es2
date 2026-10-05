@@ -92,6 +92,22 @@
 .board.is-dragging .square { cursor: grabbing; }
 .square.drop-target { outline: 3px solid rgb(255 255 255 / 75%); outline-offset: -3px; }
 
+.square.valid-move::after {
+  content: '';
+  position: absolute;
+  width: 26%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgb(247 236 116 / 55%);
+  pointer-events: none;
+}
+
+.square.valid-move:has(.piece-img)::after {
+  width: 86%;
+  background: none;
+  border: 3px solid rgb(247 236 116 / 55%);
+}
+
 .coord {
   position: absolute;
   z-index: 1;

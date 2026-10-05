@@ -22,6 +22,7 @@ def _estado_jogo(jogo: Jogo, id_partida: str) -> dict:
         "id":    id_partida,
         "fen":   jogo.tabuleiro.para_fen(),
         "turno": "brancas" if jogo.turno_atual().value == "w" else "pretas",
+        "xeque_mate": jogo.esta_em_xeque_mate(),
     }
 
 @app.post("/partida/nova")
@@ -91,6 +92,19 @@ def executar_jogada(id_partida: str):
     except JogadaInvalida as e:
         abort(400, description=str(e))
 
+
+    return jsonify({
+        "jogada": jogada.para_dict(),
+        "estado": _estado_jogo(jogo, id_partida),
+    })
+
+@app.post("/partida/<id_partida>/desfazer")
+def desfazer_jogada(id_partida: str):
+    jogo = _obter_partida(id_partida)
+
+    jogada = jogo.desfazer()
+    if jogada is None:
+        abort(400, description="Não há jogadas para desfazer.")
 
     return jsonify({
         "jogada": jogada.para_dict(),

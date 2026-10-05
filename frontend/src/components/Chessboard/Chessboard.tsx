@@ -1,7 +1,18 @@
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, LayoutGroup, MotionConfig, motion } from 'motion/react'
 import { usePieceDrag } from './usePieceDrag'
+import Promotion from './Promotion'
+import Checkmate from './Checkmate'
+import { centroDaCasa, pieceImage } from './tabuleiro'
+import {
+  desfazer,
+  jogar,
+  movimentos,
+  novaPartida,
+  type EstadoPartida,
+  type JogadaServidor,
+} from '../../api'
 import type { Color, PieceType, Square } from './types'
 import type { GameMode, BotDifficulty } from '../../types'
 import './Chessboard.css'
@@ -10,6 +21,8 @@ interface ChessboardProps {
   mode: GameMode;
   difficulty: BotDifficulty;
   corJogador: Color;
+  onVoltarMenu: () => void;
+  onTrocarLados: () => void;
 }
 
 type Piece = { color: Color; type: PieceType }
@@ -26,59 +39,73 @@ const pieceValues: Record<PieceType, number> = {
   p: 1, n: 3, b: 3, r: 5, q: 9, k: 0,
 }
 
-const initialRows = [
-  'rnbqkbnr',
-  'pppppppp',
-  '........',
-  '........',
-  '........',
-  '........',
-  'PPPPPPPP',
-  'RNBQKBNR',
-]
+const FEN_INICIAL = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w'
 
 const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] as const
 const squares = [8, 7, 6, 5, 4, 3, 2, 1].flatMap((rank) =>
   files.map((file) => `${file}${rank}` as Square),
 )
 
-function initialBoard(): Board {
+function corDoChar(caractere: string): Color {
+  return caractere === caractere.toUpperCase() ? 'w' : 'b'
+}
+
+function boardFromFen(fen: string): Board {
   const board: Board = {}
-  initialRows.forEach((row, rowIndex) => {
-    [...row].forEach((code, fileIndex) => {
-      if (code === '.') return
-      board[`${files[fileIndex]}${8 - rowIndex}` as Square] = {
-        color: code === code.toUpperCase() ? 'w' : 'b',
-        type: code.toLowerCase() as PieceType,
+  fen.split(' ')[0].split('/').forEach((linha, indice) => {
+    let coluna = 0
+    for (const caractere of linha) {
+      if (caractere >= '1' && caractere <= '8') {
+        coluna += Number(caractere)
+        continue
       }
-    })
+      board[`${files[coluna]}${8 - indice}` as Square] = {
+        color: corDoChar(caractere),
+        type: caractere.toLowerCase() as PieceType,
+      }
+      coluna += 1
+    }
   })
   return board
 }
 
-function initialPieceIds(): PieceIds {
-  return Object.fromEntries(squares.map((square) => [square, square]))
+function idsDaPosicao(board: Board): PieceIds {
+  return Object.fromEntries(Object.keys(board).map((casa) => [casa, casa])) as PieceIds
 }
 
-function pieceImage(color: Color, type: PieceType) {
-  return `https://lichess1.org/assets/piece/cburnett/${color}${type.toUpperCase()}.svg`
+const IDS_INICIAIS = idsDaPosicao(boardFromFen(FEN_INICIAL))
+
+function moverIds(
+  ids: PieceIds,
+  jogada: Pick<JogadaServidor, 'origem' | 'destino' | 'e_roque' | 'e_en_passant'>,
+): PieceIds {
+  const proximos = { ...ids }
+  if (jogada.e_en_passant) {
+    delete proximos[`${jogada.destino[0]}${jogada.origem[1]}` as Square]
+  }
+  if (jogada.e_roque) {
+    const [torreDe, torrePara] = jogada.destino === 'g1' ? ['h1', 'f1']
+      : jogada.destino === 'c1' ? ['a1', 'd1']
+      : jogada.destino === 'g8' ? ['h8', 'f8']
+      : ['a8', 'd8']
+    proximos[torrePara as Square] = ids[torreDe as Square]
+    delete proximos[torreDe as Square]
+  }
+  proximos[jogada.destino as Square] = ids[jogada.origem as Square]
+  delete proximos[jogada.origem as Square]
+  return proximos
 }
 
-function replay(moves: Move[]) {
-  const board = initialBoard()
-  const pieceIds = initialPieceIds()
-  const captured: Captured = { w: [], b: [] }
-  moves.forEach(({ from, to }) => {
-    const piece = board[from]
-    if (!piece) return
-    const target = board[to]
-    if (target && target.color !== piece.color) captured[piece.color].push(target)
-    board[to] = piece
-    delete board[from]
-    pieceIds[to] = pieceIds[from]
-    delete pieceIds[from]
-  })
-  return { board, pieceIds, captured }
+function capturas(jogadas: JogadaServidor[]): Captured {
+  const resultado: Captured = { w: [], b: [] }
+  for (const jogada of jogadas) {
+    if (!jogada.captura) continue
+    resultado[corDoChar(jogada.peca)].push({
+      color: corDoChar(jogada.captura),
+      type: jogada.captura.toLowerCase() as PieceType,
+    })
+  }
+  return resultado
 }
 
 function capturedValue(pieces: Piece[]) {
@@ -104,39 +131,95 @@ function PlayerBar({ color, name, pieces, advantage, active, position }: {
   )
 }
 
-function getArrowCoords(sq: string, virado: boolean) {
-  const file = sq.charCodeAt(0) - 97;
-  const rank = 8 - parseInt(sq[1], 10);
-  const x = file * 12.5 + 6.25;
-  const y = rank * 12.5 + 6.25;
-  // Com o tabuleiro virado, as setas são espelhadas nos dois eixos.
-  return virado ? { x: 100 - x, y: 100 - y } : { x, y };
-}
-
-export default function Chessboard({ mode, difficulty, corJogador }: ChessboardProps) {
+export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu, onTrocarLados }: ChessboardProps) {
   const boardId = useId()
   const boardRef = useRef<HTMLDivElement>(null)
-  const [board, setBoard] = useState(initialBoard)
-  const [pieceIds, setPieceIds] = useState(initialPieceIds)
+  const [partidaId, setPartidaId] = useState<string | null>(null)
+  const [board, setBoard] = useState(() => boardFromFen(FEN_INICIAL))
   const [turn, setTurn] = useState<Color>('w')
   const [selected, setSelected] = useState<Square | null>(null)
-  const [lastMove, setLastMove] = useState<Move | null>(null)
-  const [captured, setCaptured] = useState<Captured>({ w: [], b: [] })
-  const [history, setHistory] = useState<Move[]>([])
+  const [jogadas, setJogadas] = useState<JogadaServidor[]>([])
+  const [promocao, setPromocao] = useState<{ origem: Square; destino: Square } | null>(null)
+  const [xequeMate, setXequeMate] = useState(false)
+  const [ultimosMovimentos, setUltimosMovimentos] = useState<{
+    casa: Square
+    destinos: Square[]
+  } | null>(null)
   const [arrows, setArrows] = useState<Move[]>([])
   const [drawingArrow, setDrawingArrow] = useState<Move | null>(null)
   const drag = usePieceDrag({ boardRef, onSelect: setSelected, onDrop: dropPiece })
 
-  function resetGame() {
+  const history: Move[] = jogadas.map((jogada) => ({
+    from: jogada.origem as Square,
+    to: jogada.destino as Square,
+  }))
+  const lastMove = history.at(-1) ?? null
+  const idsMovidos = jogadas.reduce(moverIds, IDS_INICIAIS)
+  const pieceIds = promocao
+    ? moverIds(idsMovidos, { ...promocao, e_roque: false, e_en_passant: false })
+    : idsMovidos
+  const captured = capturas(jogadas)
+  const pecaPendente = promocao ? board[promocao.origem] : undefined
+
+  useEffect(() => {
+    let ativo = true
+    novaPartida()
+      .then((estado) => {
+        if (!ativo) return
+        setPartidaId(estado.id)
+        setBoard(boardFromFen(estado.fen))
+        setTurn(estado.turno === 'brancas' ? 'w' : 'b')
+        setXequeMate(estado.xeque_mate)
+      })
+      .catch(() => setPartidaId(null))
+    return () => {
+      ativo = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!partidaId || !selected) return
+    let ativo = true
+    movimentos(partidaId, selected)
+      .then((dados) => {
+        if (ativo) {
+          setUltimosMovimentos({
+            casa: selected,
+            destinos: dados.movimentos.map((jogada) => jogada.destino as Square),
+          })
+        }
+      })
+      .catch(() => {
+        if (ativo) setUltimosMovimentos(null)
+      })
+    return () => {
+      ativo = false
+    }
+  }, [partidaId, selected])
+
+  const destinos = ultimosMovimentos?.casa === selected ? ultimosMovimentos.destinos : []
+
+  function aplicarEstado(estado: EstadoPartida) {
+    setBoard(boardFromFen(estado.fen))
+    setTurn(estado.turno === 'brancas' ? 'w' : 'b')
+    setXequeMate(estado.xeque_mate)
+  }
+
+  async function resetGame() {
     drag.reset()
-    setBoard(initialBoard())
-    setPieceIds(initialPieceIds())
-    setCaptured({ w: [], b: [] })
-    setHistory([])
-    setArrows([])
-    setTurn('w')
     setSelected(null)
-    setLastMove(null)
+    setPromocao(null)
+    setXequeMate(false)
+    setArrows([])
+    setUltimosMovimentos(null)
+    setJogadas([])
+    try {
+      const estado = await novaPartida()
+      aplicarEstado(estado)
+      setPartidaId(estado.id)
+    } catch {
+      setPartidaId(null)
+    }
   }
 
   function advantageFor(cor: Color) {
@@ -153,30 +236,56 @@ export default function Chessboard({ mode, difficulty, corJogador }: ChessboardP
     moveRows.push({ white: history[index], black: history[index + 1] })
   }
 
-  function moveTo(to: Square, from = selected) {
-    if (!from || from === to || !board[from]) return
-    const piece = board[from]
-    const target = board[to]
-    const nextBoard = { ...board, [to]: piece }
-    delete nextBoard[from]
-    const nextIds = { ...pieceIds, [to]: pieceIds[from] }
-    delete nextIds[from]
-    if (target && target.color !== piece.color) {
-      setCaptured((previous) => ({ ...previous, [piece.color]: [...previous[piece.color], target] }))
+  async function tentarJogada(origem: Square, destino: Square): Promise<boolean> {
+    if (!partidaId || origem === destino) return false
+    const peca = board[origem]
+    if (!peca || board[destino]?.color === peca.color) return false
+    const promove = peca.type === 'p'
+      && origem[1] === (peca.color === 'w' ? '7' : '2')
+      && destino[1] === (peca.color === 'w' ? '8' : '1')
+    if (promove) {
+      let legais = destinos
+      if (!legais.includes(destino)) {
+        try {
+          legais = (await movimentos(partidaId, origem)).movimentos.map(
+            (jogada) => jogada.destino as Square,
+          )
+        } catch {
+          return false
+        }
+      }
+      if (!legais.includes(destino)) return false
+      setPromocao({ origem, destino })
+      setSelected(null)
+      return true
     }
-    setBoard(nextBoard)
-    setPieceIds(nextIds)
-    setHistory((previous) => [...previous, { from, to }])
-    setLastMove({ from, to })
-    setSelected(null)
-    setTurn(turn === 'w' ? 'b' : 'w')
+    try {
+      const { jogada, estado } = await jogar(partidaId, origem, destino)
+      setJogadas((atuais) => [...atuais, jogada])
+      aplicarEstado(estado)
+      setSelected(null)
+      return true
+    } catch {
+      return false
+    }
   }
 
-  function dropPiece(from: Square, to: Square): Square {
-    const piece = board[from]
-    if (!piece || from === to || board[to]?.color === piece.color) return from
-    moveTo(to, from)
-    return to
+  async function confirmarPromocao(tipo: PieceType) {
+    if (!partidaId || !promocao) return
+    const { origem, destino } = promocao
+    setPromocao(null)
+    try {
+      const { jogada, estado } = await jogar(partidaId, origem, destino, tipo)
+      setJogadas((atuais) => [...atuais, jogada])
+      aplicarEstado(estado)
+    } catch {
+      return
+    }
+  }
+
+  async function dropPiece(from: Square, to: Square): Promise<Square> {
+    const aceita = await tentarJogada(from, to)
+    return aceita ? to : from
   }
 
   function selectSquare(square: Square) {
@@ -184,26 +293,26 @@ export default function Chessboard({ mode, difficulty, corJogador }: ChessboardP
       setSelected(null)
       return
     }
-    const piece = board[square]
-    if (selected && (!piece || piece.color !== turn)) {
-      moveTo(square)
+    const peca = board[square]
+    if (selected && (!peca || peca.color !== turn)) {
+      void tentarJogada(selected, square)
       return
     }
-    setSelected(piece?.color === turn ? square : null)
+    setSelected(peca?.color === turn ? square : null)
   }
 
-  function undoMove() {
-    if (history.length === 0) return
+  async function undoMove() {
+    if (!partidaId || jogadas.length === 0) return
     drag.reset()
-    const previous = history.slice(0, -1)
-    const state = replay(previous)
-    setBoard(state.board)
-    setPieceIds(state.pieceIds)
-    setCaptured(state.captured)
-    setHistory(previous)
-    setTurn(previous.length % 2 === 0 ? 'w' : 'b')
-    setLastMove(previous.at(-1) ?? null)
     setSelected(null)
+    setPromocao(null)
+    try {
+      const { estado } = await desfazer(partidaId)
+      setJogadas((atuais) => atuais.slice(0, -1))
+      aplicarEstado(estado)
+    } catch {
+      return
+    }
   }
 
   const dificuldadeLabel = {
@@ -228,6 +337,7 @@ export default function Chessboard({ mode, difficulty, corJogador }: ChessboardP
                   if (event.key === 'Escape') {
                     drag.cancel()
                     setSelected(null)
+                    setPromocao(null)
                   }
                 }}>
                   <svg style={{
@@ -240,8 +350,8 @@ export default function Chessboard({ mode, difficulty, corJogador }: ChessboardP
                   zIndex: 10
                 }}>
                   {allArrows.map((arrow, i) => {
-                    const start = getArrowCoords(arrow.from, virado);
-                    const end = getArrowCoords(arrow.to, virado);
+                    const start = centroDaCasa(arrow.from, virado);
+                    const end = centroDaCasa(arrow.to, virado);
                     return (
                       <g key={`${arrow.from}-${arrow.to}-${i}`} opacity={0.8}>
                         <defs>
@@ -263,17 +373,23 @@ export default function Chessboard({ mode, difficulty, corJogador }: ChessboardP
                   })}
                 </svg>
                 {squaresVisiveis.map((square, index) => {
-                  const piece = board[square]
+                  const piece = square === promocao?.destino
+                    ? pecaPendente
+                    : square === promocao?.origem
+                      ? undefined
+                      : board[square]
                   const isDark = (Math.floor(index / 8) + index % 8) % 2 === 1
                   const isSelected = selected === square
                   const isLastMove = lastMove?.from === square || lastMove?.to === square
                   const canDrag = piece?.color === turn
+                  const isDestino = destinos.includes(square)
                   const description = piece ? `${pieceNames[piece.type]} (${piece.color === 'w' ? 'brancas' : 'pretas'})` : 'vazia'
 
                   return (
                     <button key={square} type="button" data-square={square}
                       className={['square', isDark ? 'dark' : 'light', isSelected && 'selected',
                         isLastMove && 'last-move', canDrag && 'draggable-square',
+                        isDestino && 'valid-move',
                         drag.isDragging && drag.hovered === square && 'drop-target',
                       ].filter(Boolean).join(' ')}
                       aria-label={`${square}: ${description}`}
@@ -328,6 +444,15 @@ export default function Chessboard({ mode, difficulty, corJogador }: ChessboardP
                     </button>
                   )
                 })}
+                {promocao && pecaPendente && (
+                  <Promotion
+                    cor={pecaPendente.color}
+                    destino={promocao.destino}
+                    virado={virado}
+                    onEscolher={confirmarPromocao}
+                    onCancelar={() => setPromocao(null)}
+                  />
+                )}
               </div>
             </LayoutGroup>
             <PlayerBar position="bottom" color={corJogador} name={corJogador === 'w' ? 'Brancas' : 'Pretas'} pieces={captured[corJogador]} advantage={Math.max(0, advantageFor(corJogador))} active={turn === corJogador} />
@@ -383,6 +508,19 @@ export default function Chessboard({ mode, difficulty, corJogador }: ChessboardP
             style={{ rotate: drag.rotate, transformOrigin: `${drag.floating.originX}% ${drag.floating.originY}%` }} />
         </motion.div>, document.body,
       )}
+      <AnimatePresence>
+        {xequeMate && !drag.floating && (
+          <Checkmate
+            vencedor={turn === 'w' ? 'b' : 'w'}
+            onVerTabuleiro={() => setXequeMate(false)}
+            onVoltarMenu={onVoltarMenu}
+            onTrocarLados={() => {
+              onTrocarLados()
+              void resetGame()
+            }}
+          />
+        )}
+      </AnimatePresence>
     </MotionConfig>
   )
 }

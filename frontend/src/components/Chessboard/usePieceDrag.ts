@@ -24,7 +24,7 @@ type Grab = DragPiece & {
 type DragOptions = {
   boardRef: RefObject<HTMLDivElement | null>
   onSelect: (square: Square | null) => void
-  onDrop: (from: Square, to: Square) => Square
+  onDrop: (from: Square, to: Square) => Square | Promise<Square>
 }
 
 const SPIN_THRESHOLD = 1500
@@ -167,7 +167,7 @@ export function usePieceDrag({ boardRef, onSelect, onDrop }: DragOptions) {
     ]
   }
 
-  function end(event: PointerEvent<HTMLButtonElement>) {
+  async function end(event: PointerEvent<HTMLButtonElement>) {
     const current = grab.current
     if (!current || current.pointerId !== event.pointerId) return
     releasePointer(current)
@@ -176,7 +176,7 @@ export function usePieceDrag({ boardRef, onSelect, onDrop }: DragOptions) {
       return
     }
     const target = squareAt(event.clientX, event.clientY)
-    const destination = target ? onDrop(current.square, target) : current.square
+    const destination = target ? await onDrop(current.square, target) : current.square
     settle(current, destination)
   }
 
