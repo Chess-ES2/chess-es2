@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from motor.peca import Cor
-from motor.tabuleiro import Tabuleiro
-from ia.tabelas import VALOR_PECA
+from motor.tabuleiro import Tabuleiro, coordenadas
+from ia.tabelas import VALOR_PECA, BONUS_POSICAO
 
 # Convenção: a nota é sempre do ponto de vista das brancas.
 # Brancas = max
@@ -14,6 +14,22 @@ def avaliar_material(tabuleiro: Tabuleiro) -> int:
     for peca in tabuleiro.pecas.values():
         valor = VALOR_PECA[peca.tipo]
         nota += valor if peca.cor == Cor.BRANCA else -valor
+    return nota
+
+
+def avaliar_posicional(tabuleiro: Tabuleiro) -> int:
+    #Soma o bônus de posição das peças brancas e subtrai o das pretas.
+    nota = 0
+    for casa, peca in tabuleiro.pecas.items():
+        tabela = BONUS_POSICAO.get(peca.tipo)
+        if tabela is None:
+            continue
+        coluna, linha = coordenadas(casa)
+        # A tabela começa na fileira 8: as brancas leem de baixo para cima, as pretas espelham.
+        if peca.cor == Cor.BRANCA:
+            nota += tabela[7 - linha][coluna]
+        else:
+            nota -= tabela[linha][coluna]
     return nota
 
 
