@@ -31,6 +31,9 @@ def de_coordenadas(col: int, lin: int) -> str | None:
 class Tabuleiro:
     pecas: dict[str, Peca] = field(default_factory=dict)
     turno: Cor             = Cor.BRANCA
+    direitos_roque: dict[str, bool] = field(default_factory=lambda: {"K": True, "Q": True, "k": True, "q": True})
+    casa_en_passant: str | None = None
+    _formato_completo: bool = False
 
     # Construtores
 
@@ -63,7 +66,30 @@ class Tabuleiro:
 
         turno = Cor.BRANCA if turno_str.lower() == "w" else Cor.PRETA
 
-        return Tabuleiro(pecas=pecas, turno=turno)
+        direitos_roque = {"K": True, "Q": True, "k": True, "q": True}
+        casa_en_passant = None
+        formato_completo = len(partes) >= 3
+
+        if len(partes) >= 3:
+            roque_str = partes[2]
+            direitos_roque = {
+                "K": "K" in roque_str,
+                "Q": "Q" in roque_str,
+                "k": "k" in roque_str,
+                "q": "q" in roque_str,
+            }
+
+        if len(partes) >= 4:
+            ep_str = partes[3]
+            casa_en_passant = None if ep_str == "-" else ep_str
+
+        return Tabuleiro(
+            pecas=pecas,
+            turno=turno,
+            direitos_roque=direitos_roque,
+            casa_en_passant=casa_en_passant,
+            _formato_completo=formato_completo,
+        )
 
     #Serialização:
 
@@ -89,7 +115,14 @@ class Tabuleiro:
 
         posicao = "/".join(linhas_fen)
         turno_str = "w" if self.turno == Cor.BRANCA else "b"
+
+        if self._formato_completo:
+            roque_chars = "".join(k for k, v in self.direitos_roque.items() if v) or "-"
+            ep_char = self.casa_en_passant or "-"
+            return f"{posicao} {turno_str} {roque_chars} {ep_char}"
+
         return f"{posicao} {turno_str}"
+
 
     #Acesso as casas:
 

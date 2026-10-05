@@ -21,11 +21,54 @@ def obter_movimentos_validos(tabuleiro: Tabuleiro, casa: str) -> list[Jogada]:
     movimentos_validos = []
 
     for jogada in movimentos:
+        # Roque não pode ser feito se o rei estiver em xeque ou passar por casas atacadas
+        if jogada.e_roque:
+            if esta_em_xeque(tabuleiro, peca.cor):
+                continue
+            cor_adv = peca.cor.oposta()
+            if jogada.destino == "g1":
+                if casa_sob_ataque(tabuleiro, "f1", cor_adv) or casa_sob_ataque(tabuleiro, "g1", cor_adv):
+                    continue
+            elif jogada.destino == "c1":
+                if casa_sob_ataque(tabuleiro, "d1", cor_adv) or casa_sob_ataque(tabuleiro, "c1", cor_adv):
+                    continue
+            elif jogada.destino == "g8":
+                if casa_sob_ataque(tabuleiro, "f8", cor_adv) or casa_sob_ataque(tabuleiro, "g8", cor_adv):
+                    continue
+            elif jogada.destino == "c8":
+                if casa_sob_ataque(tabuleiro, "d8", cor_adv) or casa_sob_ataque(tabuleiro, "c8", cor_adv):
+                    continue
+
         tabuleiro_copia = tabuleiro.copiar()
 
         # Simula a jogada
         tabuleiro_copia.definir(jogada.origem, None)
         tabuleiro_copia.definir(jogada.destino, jogada.peca)
+
+        # Simula en passant removendo o peao adversario
+        if jogada.e_en_passant:
+            from motor.tabuleiro import coordenadas, de_coordenadas
+            col_dest, _ = coordenadas(jogada.destino)
+            _, lin_orig = coordenadas(jogada.origem)
+            casa_capturada = de_coordenadas(col_dest, lin_orig)
+            if casa_capturada:
+                tabuleiro_copia.definir(casa_capturada, None)
+
+        # Simula roque movendo a torre junto
+        if jogada.e_roque:
+            from motor.peca import Peca
+            if jogada.destino == "g1":
+                tabuleiro_copia.definir("h1", None)
+                tabuleiro_copia.definir("f1", Peca(TipoPeca.TORRE, Cor.BRANCA))
+            elif jogada.destino == "c1":
+                tabuleiro_copia.definir("a1", None)
+                tabuleiro_copia.definir("d1", Peca(TipoPeca.TORRE, Cor.BRANCA))
+            elif jogada.destino == "g8":
+                tabuleiro_copia.definir("h8", None)
+                tabuleiro_copia.definir("f8", Peca(TipoPeca.TORRE, Cor.PRETA))
+            elif jogada.destino == "c8":
+                tabuleiro_copia.definir("a8", None)
+                tabuleiro_copia.definir("d8", Peca(TipoPeca.TORRE, Cor.PRETA))
 
         # O movimento é válido se o próprio rei não ficar em xeque
         if not esta_em_xeque(tabuleiro_copia, peca.cor):
@@ -52,7 +95,7 @@ def obter_todos_movimentos_validos(
 
 
 def validar_movimento(
-    tabuleiro: Tabuleiro, origem: str, destino: str
+    tabuleiro: Tabuleiro, origem: str, destino: str, promocao: TipoPeca | None = None
 ) -> Jogada | None:
     """Realiza as verificações:
 
@@ -74,28 +117,47 @@ def validar_movimento(
     if peca.cor != tabuleiro.turno:
         return None
 
-    # Verifica apenas os movimentos que não deixam o próprio rei em xeque
-    for jogada in obter_movimentos_validos(tabuleiro, origem):
-        if jogada.destino == destino:
-            return jogada
+    candidatas = [j for j in obter_movimentos_validos(tabuleiro, origem) if j.destino == destino]
+    if not candidatas:
+        return None
 
-    return None
+    if candidatas[0].promocao is not None:
+        tipo_escolhido = promocao if promocao is not None else TipoPeca.DAMA
+        for c in candidatas:
+            if c.promocao == tipo_escolhido:
+                return c
+        return candidatas[0]
+
+    return candidatas[0]
+
+
+def casa_sob_ataque(tabuleiro: Tabuleiro, casa: str, por_cor: Cor) -> bool:
+    """Verifica se a casa indicada está sob ataque de peças da cor especificada."""
+    from motor.tabuleiro import coordenadas
+    col_alvo, lin_alvo = coordenadas(casa)
+
+    for casa_adv in tabuleiro.casas_ocupadas_por(por_cor):
+        peca_adv = tabuleiro.obter(casa_adv)
+        if peca_adv is None:
+            continue
+        if peca_adv.tipo == TipoPeca.PEAO:
+            passo = 1 if peca_adv.cor == Cor.BRANCA else -1
+            col_peao, lin_peao = coordenadas(casa_adv)
+            if lin_peao + passo == lin_alvo and abs(col_peao - col_alvo) == 1:
+                return True
+        else:
+            for mov in gerar_movimentos_peca(tabuleiro, casa_adv):
+                if mov.destino == casa:
+                    return True
+    return False
 
 
 def esta_em_xeque(tabuleiro: Tabuleiro, cor: Cor) -> bool:
     """Verifica se o rei da cor indicada está sendo atacado."""
 
     casa_rei = tabuleiro.encontrar_rei(cor)
-    cor_adversaria = cor.oposta()
+    return casa_sob_ataque(tabuleiro, casa_rei, cor.oposta())
 
-    for casa in tabuleiro.casas_ocupadas_por(cor_adversaria):
-        movimentos = gerar_movimentos_peca(tabuleiro, casa)
-
-        for movimento in movimentos:
-            if movimento.destino == casa_rei:
-                return True
-
-    return False
 
 def esta_em_xeque_mate(tabuleiro: Tabuleiro, cor: Cor) -> bool:
 
