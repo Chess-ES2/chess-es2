@@ -161,6 +161,7 @@
   overflow: hidden;
   border-radius: 8px;
   background: #1e2025;
+  contain: size;
 }
 
 .panel-header {
@@ -277,7 +278,7 @@
 @media (max-width: 860px) {
   .game-layout { flex-direction: column; }
   .game-main { flex: none; width: 100%; }
-  .game-panel { flex: none; width: 100%; min-width: 0; }
+  .game-panel { flex: none; width: 100%; min-width: 0; contain: none; }
   .move-list { max-height: 260px; }
 }
 

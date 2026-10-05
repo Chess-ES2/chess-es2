@@ -136,6 +136,7 @@ function PlayerBar({ color, name, pieces, advantage, active, position }: {
 export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu, onTrocarLados }: ChessboardProps) {
   const boardId = useId()
   const boardRef = useRef<HTMLDivElement>(null)
+  const moveListRef = useRef<HTMLDivElement>(null)
   const [partidaId, setPartidaId] = useState<string | null>(null)
   const [board, setBoard] = useState(() => boardFromFen(FEN_INICIAL))
   const [turn, setTurn] = useState<Color>('w')
@@ -225,6 +226,11 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
       clearTimeout(timer)
     }
   }, [mode, partidaId, turn, corJogador, xequeMate, difficulty])
+
+  useEffect(() => {
+    const lista = moveListRef.current
+    if (lista) lista.scrollTop = lista.scrollHeight
+  }, [jogadas])
 
   const destinos = ultimosMovimentos?.casa === selected ? ultimosMovimentos.destinos : []
 
@@ -510,7 +516,7 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
               <span className={`turn-dot ${turn}`} aria-hidden="true" />
               Vez das {turn === 'w' ? 'brancas' : 'pretas'}
             </div>
-            <div className="move-list">
+            <div className="move-list" ref={moveListRef}>
               {moveRows.length === 0
                 ? <p className="move-empty">Arraste uma peça para começar.</p>
                 : moveRows.map((row, rowIndex) => (
