@@ -12,6 +12,9 @@ class Jogada:
     destino: str
     peca:    Peca
     captura: Peca | None = None
+    e_roque: bool = False
+    e_en_passant: bool = False
+    promocao: TipoPeca | None = None
 
     def e_captura(self) -> bool:
         #Retorna true se o movimento resulta em captura de peça adversaria.
@@ -19,15 +22,19 @@ class Jogada:
 
     def para_dict(self) -> dict:
         return {
-            "origem":  self.origem,
-            "destino": self.destino,
-            "peca":    self.peca.para_char_fen(),
-            "captura": self.captura.para_char_fen() if self.captura else None,
+            "origem":       self.origem,
+            "destino":      self.destino,
+            "peca":         self.peca.para_char_fen(),
+            "captura":      self.captura.para_char_fen() if self.captura else None,
+            "e_roque":      self.e_roque,
+            "e_en_passant": self.e_en_passant,
+            "promocao":     self.promocao.value if self.promocao else None,
         }
 
     def __repr__(self) -> str:
         captura_str = f" x {self.captura.para_char_fen()}" if self.captura else ""
         return f"Jogada({self.peca.para_char_fen()}: {self.origem} -> {self.destino}{captura_str})"
+
 
 
 #Geração de movimentos e capturas:
@@ -116,11 +123,16 @@ def _movimentos_peao(tabuleiro: Tabuleiro, casa: str, peca: Peca) -> list[Jogada
     # Brancas avançam subindo no tabuleiro (+1), Pretas descendo (-1)
     passo = 1 if peca.cor == Cor.BRANCA else -1
     linha_inicial = 1 if peca.cor == Cor.BRANCA else 6
+    linha_promocao = 7 if peca.cor == Cor.BRANCA else 0
 
     # 1. Avanço simples
     casa_frente = de_coordenadas(col, lin + passo)
     if casa_frente and tabuleiro.esta_vazia(casa_frente):
-        jogadas.append(Jogada(origem=casa, destino=casa_frente, peca=peca))
+        if lin + passo == linha_promocao:
+            for tipo_prom in (TipoPeca.DAMA, TipoPeca.TORRE, TipoPeca.BISPO, TipoPeca.CAVALO):
+                jogadas.append(Jogada(origem=casa, destino=casa_frente, peca=peca, promocao=tipo_prom))
+        else:
+            jogadas.append(Jogada(origem=casa, destino=casa_frente, peca=peca))
 
         # 2. Avanço duplo a partir da linha inicial
         if lin == linha_inicial:
@@ -135,9 +147,21 @@ def _movimentos_peao(tabuleiro: Tabuleiro, casa: str, peca: Peca) -> list[Jogada
             continue
         alvo = tabuleiro.obter(diagonal)
         if alvo is not None and alvo.cor != peca.cor:
-            jogadas.append(Jogada(origem=casa, destino=diagonal, peca=peca, captura=alvo))
+            if lin + passo == linha_promocao:
+                for tipo_prom in (TipoPeca.DAMA, TipoPeca.TORRE, TipoPeca.BISPO, TipoPeca.CAVALO):
+                    jogadas.append(Jogada(origem=casa, destino=diagonal, peca=peca, captura=alvo, promocao=tipo_prom))
+            else:
+                jogadas.append(Jogada(origem=casa, destino=diagonal, peca=peca, captura=alvo))
+        elif diagonal == tabuleiro.casa_en_passant:
+            # Captura en passant
+            casa_lateral = de_coordenadas(col + delta_col, lin)
+            if casa_lateral:
+                peao_alvo = tabuleiro.obter(casa_lateral)
+                if peao_alvo and peao_alvo.cor != peca.cor and peao_alvo.tipo == TipoPeca.PEAO:
+                    jogadas.append(Jogada(origem=casa, destino=diagonal, peca=peca, captura=peao_alvo, e_en_passant=True))
 
     return jogadas
+
 
 def _movimentos_cavalo(tabuleiro: Tabuleiro, casa: str, peca: Peca) -> list[Jogada]:
    
@@ -181,4 +205,26 @@ def _movimentos_rei(tabuleiro: Tabuleiro, casa: str, peca: Peca) -> list[Jogada]
             jogada = _avaliar_destino(tabuleiro, peca, casa, destino)
             if jogada:
                 jogadas.append(jogada)
+
+    # Roque
+    if peca.cor == Cor.BRANCA and casa == "e1":
+        if tabuleiro.direitos_roque.get("K") and tabuleiro.esta_vazia("f1") and tabuleiro.esta_vazia("g1"):
+            torre = tabuleiro.obter("h1")
+            if torre and torre.tipo == TipoPeca.TORRE and torre.cor == Cor.BRANCA:
+                jogadas.append(Jogada(origem="e1", destino="g1", peca=peca, e_roque=True))
+        if tabuleiro.direitos_roque.get("Q") and tabuleiro.esta_vazia("d1") and tabuleiro.esta_vazia("c1") and tabuleiro.esta_vazia("b1"):
+            torre = tabuleiro.obter("a1")
+            if torre and torre.tipo == TipoPeca.TORRE and torre.cor == Cor.BRANCA:
+                jogadas.append(Jogada(origem="e1", destino="c1", peca=peca, e_roque=True))
+    elif peca.cor == Cor.PRETA and casa == "e8":
+        if tabuleiro.direitos_roque.get("k") and tabuleiro.esta_vazia("f8") and tabuleiro.esta_vazia("g8"):
+            torre = tabuleiro.obter("h8")
+            if torre and torre.tipo == TipoPeca.TORRE and torre.cor == Cor.PRETA:
+                jogadas.append(Jogada(origem="e8", destino="g8", peca=peca, e_roque=True))
+        if tabuleiro.direitos_roque.get("q") and tabuleiro.esta_vazia("d8") and tabuleiro.esta_vazia("c8") and tabuleiro.esta_vazia("b8"):
+            torre = tabuleiro.obter("a8")
+            if torre and torre.tipo == TipoPeca.TORRE and torre.cor == Cor.PRETA:
+                jogadas.append(Jogada(origem="e8", destino="c8", peca=peca, e_roque=True))
+
     return jogadas
+
