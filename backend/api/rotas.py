@@ -77,10 +77,20 @@ def executar_jogada(id_partida: str):
     if not origem or not destino:
         abort(400, description="Campos 'origem' e 'destino' são obrigatórios.")
 
+    promocao_str = dados.get("promocao")
+    promocao = None
+    if promocao_str:
+        from motor.peca import TipoPeca
+        try:
+            promocao = TipoPeca(promocao_str.lower())
+        except ValueError:
+            abort(400, description=f"Tipo de promoção inválido: '{promocao_str}'.")
+
     try:
-        jogada = jogo.fazer_jogada(origem, destino)
+        jogada = jogo.fazer_jogada(origem, destino, promocao)
     except JogadaInvalida as e:
         abort(400, description=str(e))
+
 
     return jsonify({
         "jogada": jogada.para_dict(),
