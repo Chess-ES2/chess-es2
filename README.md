@@ -1,10 +1,14 @@
-É preferível que toda a documentação necessária seja visualizada por meios destes links e seus redirecionamentos. Mas em caso de qualquer problema, todos os documentos e diagramas utilizados também foram baixados e adicionados na pasta /documentacao.
+Toda a documentação necessária é acessível por meio destes links. Mas em caso de qualquer problema, todos os documentos e diagramas utilizados também foram baixados e adicionados na pasta /documentacao.
 
-Documentação do Projeto: 
-https://docs.google.com/document/d/1EDQCacfWvLBCjdXh_7zgwd9wqbn4b2d5PoFBhlLHu4o/edit?usp=sharing
+Entrega 1:
+[Documentação do Projeto](https://docs.google.com/document/d/1EDQCacfWvLBCjdXh_7zgwd9wqbn4b2d5PoFBhlLHu4o/edit?usp=sharing)
+[Slides-Apresentação-1](https://canva.link/xlduro76m4e0qeo)
+[EAP](https://miro.com/welcomeonboard/bjVoRWl0V0xnYjVnQWt2TmJhYW81cDZqeUxjaUV4VWtBR25JckplSlczemdyejIrejZ0UnBiUHppaEhTaUptZ0NQYjNsM2x3RDNGbTI3MXJWNDJFQStqclVtd3BKc3hyeWxodjFscTlVVFV1YXlxQXhQOGVQb2UxU1hOaVkrQnl0R2lncW1vRmFBVnlLcVJzTmdFdlNRPT0hdjE=?share_link_id=919471880283)
+[Planning-Poker](https://docs.google.com/spreadsheets/d/1Yz6jbonyVkHRdsvSAaqtGTZrwQl84KrsC02DeMmMkWo/edit?gid=743590422#gid=743590422&range=A1:C49)
+[Cronograma-Gannt](https://docs.google.com/spreadsheets/d/1SOWDvGxckjB0B3mOY98AnQBcsC7bbVxy6Q-bGrFTeFM/edit?gid=1578635526#gid=1578635526)
 
-Slides Apresentação 1:
-https://canva.link/xlduro76m4e0qeo
+Entrega 2:
+[Slides-Apresentação-2](https://www.canva.com/design/DAHW-cChu10/zdGLB3z2tCbWna195MAFiA/edit)
 
 ## Como rodar (frontend + backend juntos)
 
