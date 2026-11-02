@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ia.avaliacao import avaliar
+from ia.aberturas import consultar_livro
 from motor.jogo import aplicar_jogada
 from motor.movimentacao import Jogada
 from motor.peca import Cor
@@ -52,6 +53,13 @@ def melhor_jogada(tabuleiro: Tabuleiro, profundidade: int) -> Jogada | None:
     movimentos = obter_todos_movimentos_validos(tabuleiro)
     if not movimentos:
         return None
+
+    fen_atual = tabuleiro.para_fen()
+    lance_livro = consultar_livro(fen_atual, movimentos)
+    
+    if lance_livro is not None:
+        print(f"Jogada do livro de aberturas: {lance_livro.origem}{lance_livro.destino}")
+        return lance_livro
 
     melhor = movimentos[0]
     alpha = -VALOR_XEQUE_MATE * 2
