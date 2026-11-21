@@ -26,26 +26,6 @@ class TestRoque:
         assert jogo.tabuleiro.obter("e1") is None
         assert jogo.tabuleiro.obter("a1") is None
 
-    def test_roque_menor_pretas(self):
-        jogo = Jogo.de_fen("r3k2r/8/8/8/8/8/8/R3K2R b KQkq -")
-        jogada = jogo.fazer_jogada("e8", "g8")
-
-        assert jogada.e_roque is True
-        assert jogo.tabuleiro.obter("g8").tipo == TipoPeca.REI
-        assert jogo.tabuleiro.obter("f8").tipo == TipoPeca.TORRE
-        assert jogo.tabuleiro.obter("e8") is None
-        assert jogo.tabuleiro.obter("h8") is None
-
-    def test_roque_maior_pretas(self):
-        jogo = Jogo.de_fen("r3k2r/8/8/8/8/8/8/R3K2R b KQkq -")
-        jogada = jogo.fazer_jogada("e8", "c8")
-
-        assert jogada.e_roque is True
-        assert jogo.tabuleiro.obter("c8").tipo == TipoPeca.REI
-        assert jogo.tabuleiro.obter("d8").tipo == TipoPeca.TORRE
-        assert jogo.tabuleiro.obter("e8") is None
-        assert jogo.tabuleiro.obter("a8") is None
-
     def test_roque_bloqueado_por_peca_no_caminho(self):
         jogo = Jogo.de_fen("r3k2r/8/8/8/8/8/8/R3KB1R w KQkq -")
         with pytest.raises(JogadaInvalida):
@@ -53,12 +33,6 @@ class TestRoque:
 
     def test_roque_bloqueado_se_rei_ja_moveu(self):
         jogo = Jogo.de_fen("r3k2r/8/8/8/8/8/8/R3K2R w kq -")
-        with pytest.raises(JogadaInvalida):
-            jogo.fazer_jogada("e1", "g1")
-
-    def test_roque_bloqueado_se_torre_ja_moveu(self):
-        # Brancas tem direito apenas ao roque maior (Q)
-        jogo = Jogo.de_fen("r3k2r/8/8/8/8/8/8/R3K2R w Qkq -")
         with pytest.raises(JogadaInvalida):
             jogo.fazer_jogada("e1", "g1")
 

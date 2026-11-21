@@ -92,3 +92,39 @@ class TestTabuleiro:
     def test_fen_invalida_menos_campos(self):
         with pytest.raises(ValueError):
             Tabuleiro.de_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")
+
+    def test_fen_minima_parseada_turno_pretas(self):
+        tab = Tabuleiro.de_fen("8/8/8/8/8/8/8/4k2K b")
+        assert tab.turno == Cor.PRETA
+
+    def test_fen_completa_le_direitos_de_roque(self):
+        tab = Tabuleiro.de_fen("r3k2r/8/8/8/8/8/8/R3K2R w Kq -")
+        assert tab.direitos_roque == {"K": True, "Q": False, "k": False, "q": True}
+
+    def test_fen_com_traco_desativa_roque(self):
+        tab = Tabuleiro.de_fen("r3k2r/8/8/8/8/8/8/R3K2R w - -")
+        assert tab.direitos_roque == {"K": False, "Q": False, "k": False, "q": False}
+
+    def test_fen_completa_le_casa_en_passant(self):
+        tab = Tabuleiro.de_fen("8/8/8/8/8/8/8/4K2k w - d6")
+        assert tab.casa_en_passant == "d6"
+
+    def test_fen_com_traco_en_passant_e_none(self):
+        tab = Tabuleiro.de_fen("8/8/8/8/8/8/8/4K2k w - -")
+        assert tab.casa_en_passant is None
+
+    def test_para_fen_completo_inclui_roque_e_ep(self):
+        tab = Tabuleiro.de_fen("r3k2r/8/8/8/8/8/8/R3K2R w Kq d6")
+        assert tab.para_fen() == "r3k2r/8/8/8/8/8/8/R3K2R w Kq d6"
+
+    def test_para_fen_sem_direitos_serializa_traco(self):
+        tab = Tabuleiro.de_fen("8/8/8/8/8/8/8/4K2k w - -")
+        assert tab.para_fen() == "8/8/8/8/8/8/8/4K2k w - -"
+
+    def test_modificar_copia_nao_altera_turno_do_original(self):
+        tab = Tabuleiro.inicial()
+        copia = tab.copiar()
+        copia.turno = Cor.PRETA
+        copia.casa_en_passant = "e3"
+        assert tab.turno == Cor.BRANCA
+        assert tab.casa_en_passant is None

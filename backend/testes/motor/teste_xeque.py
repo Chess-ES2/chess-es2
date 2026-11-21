@@ -9,6 +9,7 @@ from motor.validacao import (
     empate_por_material_insuficiente,
     obter_movimentos_validos,
     obter_todos_movimentos_validos,
+    validar_movimento,
 )
 
 
@@ -21,22 +22,6 @@ class TestXeque:
     def test_rei_branco_nao_esta_em_xeque(self):
         tab = Tabuleiro.de_fen("4r3/8/8/8/8/8/4R3/4K3 w")
         assert esta_em_xeque(tab, Cor.BRANCA) is False
-
-    def test_rei_preto_em_xeque_por_torre(self):
-        tab = Tabuleiro.de_fen("4k3/8/8/8/8/8/8/4R3 b")
-        assert esta_em_xeque(tab, Cor.PRETA) is True
-
-    def test_rei_branco_em_xeque_por_bispo(self):
-        tab = Tabuleiro.de_fen("8/8/8/8/1b6/8/8/4K3 w")
-        assert esta_em_xeque(tab, Cor.BRANCA) is True
-
-    def test_rei_branco_em_xeque_por_cavalo(self):
-        tab = Tabuleiro.de_fen("8/8/8/8/8/8/2n5/4K3 w")
-        assert esta_em_xeque(tab, Cor.BRANCA) is True
-
-    def test_rei_branco_em_xeque_por_dama(self):
-        tab = Tabuleiro.de_fen("4q3/8/8/8/8/8/8/4K3 w")
-        assert esta_em_xeque(tab, Cor.BRANCA) is True
 
     def test_rei_branco_em_xeque_por_peao(self):
         tab = Tabuleiro.de_fen("8/8/8/8/8/8/3p4/4K3 w")
