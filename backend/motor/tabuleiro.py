@@ -1,5 +1,4 @@
 from __future__ import annotations
-from copy import deepcopy
 from dataclasses import dataclass, field
 
 from motor.peca import Cor, Peca, TipoPeca
@@ -7,24 +6,31 @@ from motor.peca import Cor, Peca, TipoPeca
 COLUNAS = "abcdefgh"
 LINHAS  = "12345678"
 
+# Tabelas pré-computadas para conversão O(1) entre casa algébrica e (col, lin)
+_CASA_PARA_COORD: dict[str, tuple[int, int]] = {
+    f"{COLUNAS[col]}{LINHAS[lin]}": (col, lin)
+    for lin in range(8)
+    for col in range(8)
+}
+_COORD_PARA_CASA: tuple[tuple[str, ...], ...] = tuple(
+    tuple(f"{COLUNAS[col]}{LINHAS[lin]}" for col in range(8))
+    for lin in range(8)
+)
+
 # Posição inicial padrão das peças e turno das brancas
 FEN_INICIAL = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w"
 
 def casa_valida(casa: str) -> bool:
-    return (
-        len(casa) == 2
-        and casa[0] in COLUNAS
-        and casa[1] in LINHAS
-    )
+    return casa in _CASA_PARA_COORD
 
 def coordenadas(casa: str) -> tuple[int, int]:
     #Converte notação algebrica para indices (coluna, linha) com base 0.
-    return COLUNAS.index(casa[0]), int(casa[1]) - 1
+    return _CASA_PARA_COORD[casa]
 
 def de_coordenadas(col: int, lin: int) -> str | None:
     #Converte índices (coluna, linha) para notação algebrica.
     if 0 <= col <= 7 and 0 <= lin <= 7:
-        return f"{COLUNAS[col]}{LINHAS[lin]}"
+        return _COORD_PARA_CASA[lin][col]
     return None
 
 @dataclass
@@ -148,7 +154,13 @@ class Tabuleiro:
         raise ValueError(f"Rei {'branco' if cor == Cor.BRANCA else 'preto'} não encontrado no tabuleiro.")
 
     def copiar(self) -> Tabuleiro:
-        return deepcopy(self)
+        return Tabuleiro(
+            pecas=self.pecas.copy(),
+            turno=self.turno,
+            direitos_roque=self.direitos_roque.copy(),
+            casa_en_passant=self.casa_en_passant,
+            _formato_completo=self._formato_completo,
+        )
 
     def __repr__(self) -> str:
         return f"Tabuleiro({self.para_fen()})"

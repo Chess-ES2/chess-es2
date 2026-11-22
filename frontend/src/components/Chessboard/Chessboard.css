@@ -96,6 +96,16 @@
   position: relative;
 }
 
+.board-arrows {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+  filter: drop-shadow(0 2px 3px rgb(0 0 0 / 32%));
+}
+
 .square {
   position: relative;
   display: flex;
@@ -161,7 +171,8 @@
 .dragged-piece img {
   width: 100%;
   height: 100%;
-  filter: drop-shadow(0 12px 6px rgb(0 0 0 / 40%));
+  filter: drop-shadow(0 16px 10px rgb(0 0 0 / 48%));
+  will-change: transform;
 }
 
 .piece-img {
@@ -355,7 +366,8 @@
 .action-button.ativa:hover { background: #468c5b; }
 
 .panel-actions .action-button { font-size: 0.78rem; gap: 6px; white-space: nowrap; }
-.panel-actions .action-button.avaliacao { flex: 0 0 46px; }
+.panel-actions .action-button.avaliacao,
+.panel-actions .action-button.velocidade { flex: 0 0 46px; }
 
 @media (max-width: 860px) {
   .game-layout { flex-direction: column; }

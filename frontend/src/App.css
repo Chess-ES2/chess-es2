@@ -99,6 +99,16 @@
   gap: 10px;
 }
 
+.button-group-3 {
+  gap: 8px;
+}
+
+.button-group-3 button {
+  padding: 11px 6px;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
 .button-group button {
   flex: 1;
   padding: 12px 10px;
@@ -142,6 +152,19 @@
     0 0 4px rgb(255 255 255 / 45%);
 }
 
+/* --- Revelação animada de seções do menu --- */
+.menu-reveal {
+  margin-block: -12px;
+  overflow: hidden;
+}
+
+.menu-reveal-conteudo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-block: 12px;
+}
+
 /* --- Dificuldade do bot (revelada com animação de altura) --- */
 .menu-dificuldade {
   /* Compensa o gap de 24px do .menu-container: recolhido não sobra espaço extra. */
@@ -155,6 +178,16 @@
   gap: 10px;
   /* Padding lateral para o glow/foco da esfera não ser cortado pelo overflow do reveal. */
   padding: 12px 14px;
+}
+
+.menu-dificuldade-dupla {
+  gap: 16px;
+}
+
+.bot-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .start-button {
