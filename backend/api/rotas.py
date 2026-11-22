@@ -36,12 +36,16 @@ def nova_partida():
 
     try:
         jogo = Jogo.de_fen(fen) if fen else Jogo.novo()
+        # A montagem do estado já exercita avaliação e leitura do tabuleiro: uma FEN
+        # sintaticamente válida mas sem reis (ex.: "8/8/8 w") estoura aqui dentro e
+        # precisa virar 400, não 500.
+        id_partida = str(uuid.uuid4())
+        estado = _estado_jogo(jogo, id_partida)
     except ValueError as e:
-        abort(400, description=str(e))
+        return jsonify({"erro": str(e)}), 400
 
-    id_partida = str(uuid.uuid4())
     partidas[id_partida] = jogo
-    return jsonify(_estado_jogo(jogo, id_partida)), 201
+    return jsonify(estado), 201
 
 @app.get("/partida/<id_partida>/estado")
 def estado_partida(id_partida: str):
