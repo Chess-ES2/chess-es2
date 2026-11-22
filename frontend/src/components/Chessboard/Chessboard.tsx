@@ -364,7 +364,8 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
   const dificuldadeLabel = {
     easy: 'Fácil',
     medium: 'Médio',
-    hard: 'Difícil'
+    hard: 'Difícil',
+    expert: 'Expert',
   };
 
   const allArrows = [...arrows, drawingArrow].filter(Boolean) as Move[];

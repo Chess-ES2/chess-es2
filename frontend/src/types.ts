@@ -1,4 +1,4 @@
 
 export type GamePhase = 'menu' | 'playing'
 export type GameMode = 'local' | 'bot'
-export type BotDifficulty = 'easy' | 'medium' | 'hard'
+export type BotDifficulty = 'easy' | 'medium' | 'hard' | 'expert'

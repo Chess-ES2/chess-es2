@@ -5,7 +5,7 @@ import uuid
 from flask import Flask, jsonify, request, abort
 
 from ia.avaliacao import avaliar
-from ia.busca import PROFUNDIDADES, melhor_jogada
+from ia.busca import melhor_jogada_dificuldade
 from motor.jogo import Jogo, JogadaInvalida
 
 app = Flask(__name__)
@@ -118,9 +118,9 @@ def desfazer_jogada(id_partida: str):
 def jogada_bot(id_partida: str):
     jogo = _obter_partida(id_partida)
     dados = request.get_json(silent=True) or {}
-    profundidade = PROFUNDIDADES.get(dados.get("dificuldade"), PROFUNDIDADES["medium"])
+    dificuldade = dados.get("dificuldade", "medium")
 
-    jogada = melhor_jogada(jogo.tabuleiro, profundidade)
+    jogada = melhor_jogada_dificuldade(jogo.tabuleiro, dificuldade)
     if jogada is None:
         abort(400, description="Não há jogadas disponíveis para o bot.")
 
