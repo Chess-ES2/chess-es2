@@ -60,10 +60,9 @@
 }
 
 .slider-rotulos {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  /* Mesmos recuos da trilha: o primeiro rótulo começa onde a esfera para,
-     o último termina onde ela para, e o do meio fica centralizado. */
+  display: flex;
+  justify-content: space-between;
+  /* Mesmos recuos da trilha para os rótulos acompanharem os stops. */
   margin: 0 12px;
 }
 
@@ -73,29 +72,17 @@
   justify-content: center;
   min-height: 40px;
   /* Padding horizontal anulado por margem para não deslocar o alinhamento. */
-  padding: 2px 8px 12px;
-  margin-inline: -8px;
+  padding: 2px 6px 12px;
+  margin-inline: -6px;
   border: none;
   border-radius: 8px;
   background-color: transparent;
   color: #7f828c;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
   transition: color 0.25s ease, background-color 0.15s ease;
-}
-
-.slider-rotulos button:nth-child(1) {
-  justify-self: start;
-}
-
-.slider-rotulos button:nth-child(2) {
-  justify-self: center;
-}
-
-.slider-rotulos button:nth-child(3) {
-  justify-self: end;
 }
 
 .slider-rotulos button:hover {

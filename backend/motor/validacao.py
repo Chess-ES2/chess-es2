@@ -1,12 +1,31 @@
 from __future__ import annotations
 
-from motor.peca import Cor, TipoPeca
-from motor.tabuleiro import Tabuleiro
+from motor.peca import Cor, Peca, TipoPeca
+from motor.tabuleiro import Tabuleiro, _COORD_PARA_CASA, coordenadas, de_coordenadas
 from motor.movimentacao import (
     Jogada,
     gerar_movimentos_peca,
     gerar_todos_movimentos,
 )
+
+_SALTOS_CAVALO = (
+    (-2, -1), (-2, 1), (-1, -2), (-1, 2),
+    ( 1, -2), ( 1, 2), ( 2, -1), ( 2, 1),
+)
+_PASSOS_REI = (
+    (-1, -1), (-1, 0), (-1, 1),
+    ( 0, -1),          ( 0, 1),
+    ( 1, -1), ( 1, 0), ( 1, 1),
+)
+_RAIOS_ORTOGONAIS = ((-1, 0), (1, 0), (0, -1), (0, 1))
+_RAIOS_DIAGONAIS = ((-1, -1), (-1, 1), (1, -1), (1, 1))
+
+_ROQUE_TORRES: dict[str, tuple[str, str, Cor]] = {
+    "g1": ("h1", "f1", Cor.BRANCA),
+    "c1": ("a1", "d1", Cor.BRANCA),
+    "g8": ("h8", "f8", Cor.PRETA),
+    "c8": ("a8", "d8", Cor.PRETA),
+}
 
 
 def obter_movimentos_validos(tabuleiro: Tabuleiro, casa: str) -> list[Jogada]:
@@ -18,14 +37,16 @@ def obter_movimentos_validos(tabuleiro: Tabuleiro, casa: str) -> list[Jogada]:
         return []
 
     movimentos = gerar_movimentos_peca(tabuleiro, casa)
-    movimentos_validos = []
+    movimentos_validos: list[Jogada] = []
+    pecas = tabuleiro.pecas
+    cor = peca.cor
+    cor_adv = cor.oposta()
 
     for jogada in movimentos:
         # Roque não pode ser feito se o rei estiver em xeque ou passar por casas atacadas
         if jogada.e_roque:
-            if esta_em_xeque(tabuleiro, peca.cor):
+            if esta_em_xeque(tabuleiro, cor):
                 continue
-            cor_adv = peca.cor.oposta()
             if jogada.destino == "g1":
                 if casa_sob_ataque(tabuleiro, "f1", cor_adv) or casa_sob_ataque(tabuleiro, "g1", cor_adv):
                     continue
@@ -39,40 +60,46 @@ def obter_movimentos_validos(tabuleiro: Tabuleiro, casa: str) -> list[Jogada]:
                 if casa_sob_ataque(tabuleiro, "d8", cor_adv) or casa_sob_ataque(tabuleiro, "c8", cor_adv):
                     continue
 
-        tabuleiro_copia = tabuleiro.copiar()
+        # Simulação in-place (make/unmake) sem alocar cópia do Tabuleiro
+        origem = jogada.origem
+        destino = jogada.destino
+        peca_origem = pecas.pop(origem, None)
+        peca_destino = pecas.get(destino)
+        pecas[destino] = jogada.peca
 
-        # Simula a jogada
-        tabuleiro_copia.definir(jogada.origem, None)
-        tabuleiro_copia.definir(jogada.destino, jogada.peca)
-
-        # Simula en passant removendo o peao adversario
+        casa_ep: str | None = None
+        peca_ep: Peca | None = None
         if jogada.e_en_passant:
-            from motor.tabuleiro import coordenadas, de_coordenadas
-            col_dest, _ = coordenadas(jogada.destino)
-            _, lin_orig = coordenadas(jogada.origem)
-            casa_capturada = de_coordenadas(col_dest, lin_orig)
-            if casa_capturada:
-                tabuleiro_copia.definir(casa_capturada, None)
+            col_dest, _ = coordenadas(destino)
+            _, lin_orig = coordenadas(origem)
+            casa_ep = _COORD_PARA_CASA[lin_orig][col_dest]
+            peca_ep = pecas.pop(casa_ep, None)
 
-        # Simula roque movendo a torre junto
+        torre_orig: str | None = None
+        torre_dest: str | None = None
+        peca_torre: Peca | None = None
         if jogada.e_roque:
-            from motor.peca import Peca
-            if jogada.destino == "g1":
-                tabuleiro_copia.definir("h1", None)
-                tabuleiro_copia.definir("f1", Peca(TipoPeca.TORRE, Cor.BRANCA))
-            elif jogada.destino == "c1":
-                tabuleiro_copia.definir("a1", None)
-                tabuleiro_copia.definir("d1", Peca(TipoPeca.TORRE, Cor.BRANCA))
-            elif jogada.destino == "g8":
-                tabuleiro_copia.definir("h8", None)
-                tabuleiro_copia.definir("f8", Peca(TipoPeca.TORRE, Cor.PRETA))
-            elif jogada.destino == "c8":
-                tabuleiro_copia.definir("a8", None)
-                tabuleiro_copia.definir("d8", Peca(TipoPeca.TORRE, Cor.PRETA))
+            torre_orig, torre_dest, cor_torre = _ROQUE_TORRES[destino]
+            peca_torre = pecas.pop(torre_orig, None)
+            pecas[torre_dest] = peca_torre or Peca(TipoPeca.TORRE, cor_torre)
 
-        # O movimento é válido se o próprio rei não ficar em xeque
-        if not esta_em_xeque(tabuleiro_copia, peca.cor):
-            movimentos_validos.append(jogada)
+        try:
+            if not esta_em_xeque(tabuleiro, cor):
+                movimentos_validos.append(jogada)
+        finally:
+            # Desfaz a simulação in-place
+            if torre_orig is not None and torre_dest is not None:
+                pecas.pop(torre_dest, None)
+                if peca_torre is not None:
+                    pecas[torre_orig] = peca_torre
+            if casa_ep is not None and peca_ep is not None:
+                pecas[casa_ep] = peca_ep
+            if peca_destino is None:
+                pecas.pop(destino, None)
+            else:
+                pecas[destino] = peca_destino
+            if peca_origem is not None:
+                pecas[origem] = peca_origem
 
     return movimentos_validos
 
@@ -84,7 +111,7 @@ def obter_todos_movimentos_validos(
 
     cor_alvo = cor if cor is not None else tabuleiro.turno
 
-    movimentos_validos = []
+    movimentos_validos: list[Jogada] = []
 
     for casa in tabuleiro.casas_ocupadas_por(cor_alvo):
         movimentos_validos.extend(
@@ -132,23 +159,69 @@ def validar_movimento(
 
 
 def casa_sob_ataque(tabuleiro: Tabuleiro, casa: str, por_cor: Cor) -> bool:
-    """Verifica se a casa indicada está sob ataque de peças da cor especificada."""
-    from motor.tabuleiro import coordenadas
+    """Verifica se a casa indicada está sob ataque de peças da cor especificada.
+    Usa busca reversa a partir da casa alvo sem alocar objetos Jogada."""
     col_alvo, lin_alvo = coordenadas(casa)
+    pecas = tabuleiro.pecas
+    coord_para_casa = _COORD_PARA_CASA
 
-    for casa_adv in tabuleiro.casas_ocupadas_por(por_cor):
-        peca_adv = tabuleiro.obter(casa_adv)
-        if peca_adv is None:
-            continue
-        if peca_adv.tipo == TipoPeca.PEAO:
-            passo = 1 if peca_adv.cor == Cor.BRANCA else -1
-            col_peao, lin_peao = coordenadas(casa_adv)
-            if lin_peao + passo == lin_alvo and abs(col_peao - col_alvo) == 1:
+    # 1. Peões atacantes (um peão branco ataca subindo +1, logo vem de lin_alvo - 1)
+    lin_peao = lin_alvo - 1 if por_cor == Cor.BRANCA else lin_alvo + 1
+    if 0 <= lin_peao <= 7:
+        linha_casas = coord_para_casa[lin_peao]
+        if col_alvo > 0:
+            p = pecas.get(linha_casas[col_alvo - 1])
+            if p is not None and p.cor == por_cor and p.tipo == TipoPeca.PEAO:
                 return True
-        else:
-            for mov in gerar_movimentos_peca(tabuleiro, casa_adv):
-                if mov.destino == casa:
+        if col_alvo < 7:
+            p = pecas.get(linha_casas[col_alvo + 1])
+            if p is not None and p.cor == por_cor and p.tipo == TipoPeca.PEAO:
+                return True
+
+    # 2. Cavalos atacantes
+    for dc, dl in _SALTOS_CAVALO:
+        c = col_alvo + dc
+        l = lin_alvo + dl
+        if 0 <= c <= 7 and 0 <= l <= 7:
+            p = pecas.get(coord_para_casa[l][c])
+            if p is not None and p.cor == por_cor and p.tipo == TipoPeca.CAVALO:
+                return True
+
+    # 3. Raios ortogonais (Torre / Dama)
+    for dc, dl in _RAIOS_ORTOGONAIS:
+        c = col_alvo + dc
+        l = lin_alvo + dl
+        while 0 <= c <= 7 and 0 <= l <= 7:
+            p = pecas.get(coord_para_casa[l][c])
+            if p is not None:
+                if p.cor == por_cor and (p.tipo == TipoPeca.TORRE or p.tipo == TipoPeca.DAMA):
                     return True
+                break
+            c += dc
+            l += dl
+
+    # 4. Raios diagonais (Bispo / Dama)
+    for dc, dl in _RAIOS_DIAGONAIS:
+        c = col_alvo + dc
+        l = lin_alvo + dl
+        while 0 <= c <= 7 and 0 <= l <= 7:
+            p = pecas.get(coord_para_casa[l][c])
+            if p is not None:
+                if p.cor == por_cor and (p.tipo == TipoPeca.BISPO or p.tipo == TipoPeca.DAMA):
+                    return True
+                break
+            c += dc
+            l += dl
+
+    # 5. Rei adjacente
+    for dc, dl in _PASSOS_REI:
+        c = col_alvo + dc
+        l = lin_alvo + dl
+        if 0 <= c <= 7 and 0 <= l <= 7:
+            p = pecas.get(coord_para_casa[l][c])
+            if p is not None and p.cor == por_cor and p.tipo == TipoPeca.REI:
+                return True
+
     return False
 
 

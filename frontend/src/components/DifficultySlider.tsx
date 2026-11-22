@@ -15,6 +15,7 @@ const DIFICULDADES: { valor: BotDifficulty; rotulo: string; cor: string }[] = [
   { valor: 'easy', rotulo: 'Fácil', cor: '#4ade80' },
   { valor: 'medium', rotulo: 'Médio', cor: '#facc15' },
   { valor: 'hard', rotulo: 'Difícil', cor: '#ef4444' },
+  { valor: 'expert', rotulo: 'Expert', cor: '#a855f7' },
 ]
 
 const PASSOS: Record<string, number> = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }

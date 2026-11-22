@@ -48,6 +48,7 @@ const dificuldadeLabel: Record<BotDifficulty, string> = {
   easy: 'Fácil',
   medium: 'Médio',
   hard: 'Difícil',
+  expert: 'Expert',
 }
 
 const FEN_INICIAL = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w'
