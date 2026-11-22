@@ -5,6 +5,7 @@ import { usePieceDrag } from './usePieceDrag'
 import Promotion from './Promotion'
 import Checkmate from './Checkmate'
 import EvalBar from './EvalBar'
+import { formatarSAN } from './notacao'
 import { centroDaCasa, pieceImage } from './tabuleiro'
 import {
   desfazer,
@@ -129,6 +130,7 @@ function PlayerBar({ color, name, pieces, advantage, active, position }: {
         ))}
         {advantage > 0 && <span className="material-advantage">+{advantage}</span>}
       </span>
+      {active && <span className="player-turn-dot" aria-hidden="true" />}
     </div>
   )
 }
@@ -142,6 +144,10 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
   const [turn, setTurn] = useState<Color>('w')
   const [selected, setSelected] = useState<Square | null>(null)
   const [jogadas, setJogadas] = useState<JogadaServidor[]>([])
+  const [fens, setFens] = useState<string[]>([FEN_INICIAL])
+  const [cps, setCps] = useState<number[]>([0])
+  const [sans, setSans] = useState<string[]>([])
+  const [indiceVisualizado, setIndiceVisualizado] = useState<number | null>(null)
   const [promocao, setPromocao] = useState<{ origem: Square; destino: Square } | null>(null)
   const [xequeMate, setXequeMate] = useState(false)
   const [cp, setCp] = useState(0)
@@ -156,17 +162,25 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
   const [drawingArrow, setDrawingArrow] = useState<Move | null>(null)
   const drag = usePieceDrag({ boardRef, onSelect: setSelected, onDrop: dropPiece })
 
+  const estaInspecionando = indiceVisualizado !== null && indiceVisualizado < jogadas.length - 1
+  const indiceAtivo = estaInspecionando ? indiceVisualizado : jogadas.length - 1
+  const jogadasVisiveis = estaInspecionando ? jogadas.slice(0, indiceVisualizado + 1) : jogadas
+  const boardVisivel = estaInspecionando && fens[indiceVisualizado + 1]
+    ? boardFromFen(fens[indiceVisualizado + 1])
+    : board
+  const cpVisivel = estaInspecionando ? (cps[indiceVisualizado + 1] ?? cp) : cp
+
   const history: Move[] = jogadas.map((jogada) => ({
     from: jogada.origem as Square,
     to: jogada.destino as Square,
   }))
-  const lastMove = history.at(-1) ?? null
-  const idsMovidos = jogadas.reduce(moverIds, IDS_INICIAIS)
-  const pieceIds = promocao
+  const lastMove = indiceAtivo >= 0 ? (history[indiceAtivo] ?? null) : null
+  const idsMovidos = jogadasVisiveis.reduce(moverIds, IDS_INICIAIS)
+  const pieceIds = promocao && !estaInspecionando
     ? moverIds(idsMovidos, { ...promocao, e_roque: false, e_en_passant: false })
     : idsMovidos
-  const captured = capturas(jogadas)
-  const pecaPendente = promocao ? board[promocao.origem] : undefined
+  const captured = capturas(jogadasVisiveis)
+  const pecaPendente = promocao && !estaInspecionando ? board[promocao.origem] : undefined
 
   useEffect(() => {
     let ativo = true
@@ -175,6 +189,10 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
         if (!ativo) return
         setPartidaId(estado.id)
         setBoard(boardFromFen(estado.fen))
+        setFens([estado.fen])
+        setCps([estado.cp])
+        setSans([])
+        setIndiceVisualizado(null)
         setTurn(estado.turno === 'brancas' ? 'w' : 'b')
         setXequeMate(estado.xeque_mate)
         setCp(estado.cp)
@@ -205,6 +223,20 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
     }
   }, [partidaId, selected])
 
+  function registrarJogada(jogada: JogadaServidor, estado: EstadoPartida) {
+    const boardDepois = boardFromFen(estado.fen)
+    setFens((atuais) => {
+      const fenAntes = atuais.at(-1) ?? FEN_INICIAL
+      const san = formatarSAN(jogada, boardFromFen(fenAntes), boardDepois, estado.xeque_mate)
+      setSans((s) => [...s, san])
+      return [...atuais, estado.fen]
+    })
+    setCps((atuais) => [...atuais, estado.cp])
+    setJogadas((atuais) => [...atuais, jogada])
+    setIndiceVisualizado(null)
+    aplicarEstado(estado)
+  }
+
   useEffect(() => {
     if (mode !== 'bot' || !partidaId || xequeMate) return
     if (turn === corJogador) return
@@ -213,11 +245,7 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
       jogarBot(partidaId, difficulty)
         .then(({ jogada, estado }) => {
           if (!ativo) return
-          setJogadas((atuais) => [...atuais, jogada])
-          setBoard(boardFromFen(estado.fen))
-          setTurn(estado.turno === 'brancas' ? 'w' : 'b')
-          setXequeMate(estado.xeque_mate)
-          setCp(estado.cp)
+          registrarJogada(jogada, estado)
         })
         .catch(() => {})
     }, 400)
@@ -226,6 +254,28 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
       clearTimeout(timer)
     }
   }, [mode, partidaId, turn, corJogador, xequeMate, difficulty])
+
+  useEffect(() => {
+    function aoTeclar(event: KeyboardEvent) {
+      if (jogadas.length === 0) return
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault()
+        setSelected(null)
+        setIndiceVisualizado((atual) => {
+          const base = atual === null ? jogadas.length - 1 : atual
+          return Math.max(0, base - 1)
+        })
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault()
+        setIndiceVisualizado((atual) => {
+          if (atual === null) return null
+          return atual + 1 >= jogadas.length - 1 ? null : atual + 1
+        })
+      }
+    }
+    window.addEventListener('keydown', aoTeclar)
+    return () => window.removeEventListener('keydown', aoTeclar)
+  }, [jogadas.length])
 
   useEffect(() => {
     const lista = moveListRef.current
@@ -255,9 +305,15 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
     setArrows([])
     setUltimosMovimentos(null)
     setJogadas([])
+    setFens([FEN_INICIAL])
+    setCps([0])
+    setSans([])
+    setIndiceVisualizado(null)
     try {
       const estado = await novaPartida()
       aplicarEstado(estado)
+      setFens([estado.fen])
+      setCps([estado.cp])
       setPartidaId(estado.id)
     } catch {
       setPartidaId(null)
@@ -272,14 +328,28 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
   const virado = corJogador === 'b'
   const corTopo: Color = virado ? 'w' : 'b'
   const squaresVisiveis = virado ? [...squares].reverse() : squares
-  const podeMover = (cor: Color) => cor === turn && (mode === 'local' || cor === corJogador)
+  const podeMover = (cor: Color) =>
+    !estaInspecionando && cor === turn && (mode === 'local' || cor === corJogador)
   const nomeDaCor = (cor: Color) => (mode === 'bot' && cor !== corJogador
     ? 'Computador'
     : cor === 'w' ? 'Brancas' : 'Pretas')
 
-  const moveRows: Array<{ white: Move; black?: Move }> = []
-  for (let index = 0; index < history.length; index += 2) {
-    moveRows.push({ white: history[index], black: history[index + 1] })
+  const moveRows: Array<{ whiteIdx: number; white: string; blackIdx?: number; black?: string }> = []
+  for (let index = 0; index < jogadas.length; index += 2) {
+    moveRows.push({
+      whiteIdx: index,
+      white: sans[index] ?? `${jogadas[index].origem}-${jogadas[index].destino}`,
+      blackIdx: index + 1 < jogadas.length ? index + 1 : undefined,
+      black: index + 1 < jogadas.length
+        ? (sans[index + 1] ?? `${jogadas[index + 1].origem}-${jogadas[index + 1].destino}`)
+        : undefined,
+    })
+  }
+
+  function inspecionarLance(indice: number) {
+    setSelected(null)
+    setPromocao(null)
+    setIndiceVisualizado(indice >= jogadas.length - 1 ? null : indice)
   }
 
   async function tentarJogada(origem: Square, destino: Square): Promise<boolean> {
@@ -307,8 +377,7 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
     }
     try {
       const { jogada, estado } = await jogar(partidaId, origem, destino)
-      setJogadas((atuais) => [...atuais, jogada])
-      aplicarEstado(estado)
+      registrarJogada(jogada, estado)
       setSelected(null)
       return true
     } catch {
@@ -322,8 +391,7 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
     setPromocao(null)
     try {
       const { jogada, estado } = await jogar(partidaId, origem, destino, tipo)
-      setJogadas((atuais) => [...atuais, jogada])
-      aplicarEstado(estado)
+      registrarJogada(jogada, estado)
     } catch {
       return
     }
@@ -352,9 +420,13 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
     drag.reset()
     setSelected(null)
     setPromocao(null)
+    setIndiceVisualizado(null)
     try {
       const { estado } = await desfazer(partidaId)
       setJogadas((atuais) => atuais.slice(0, -1))
+      setFens((atuais) => (atuais.length > 1 ? atuais.slice(0, -1) : atuais))
+      setCps((atuais) => (atuais.length > 1 ? atuais.slice(0, -1) : atuais))
+      setSans((atuais) => atuais.slice(0, -1))
       aplicarEstado(estado)
     } catch {
       return
@@ -377,7 +449,7 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
             <PlayerBar position="top" color={corTopo} name={nomeDaCor(corTopo)} pieces={captured[corTopo]} advantage={Math.max(0, advantageFor(corTopo))} active={turn === corTopo} />
             <div className="board-area">
               {mostrarAvaliacao && (
-                <EvalBar cp={cp} turno={turn} virado={virado} xequeMate={xequeMate} />
+                <EvalBar cp={cpVisivel} turno={turn} virado={virado} xequeMate={xequeMate && !estaInspecionando} />
               )}
               <LayoutGroup id={`${boardId}`}>
               <div ref={boardRef} className={`board${drag.isDragging ? ' is-dragging' : ''}`} role="group" aria-label="Tabuleiro de xadrez"
@@ -423,11 +495,11 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
                   })}
                 </svg>
                 {squaresVisiveis.map((square, index) => {
-                  const piece = square === promocao?.destino
+                  const piece = !estaInspecionando && square === promocao?.destino
                     ? pecaPendente
-                    : square === promocao?.origem
+                    : !estaInspecionando && square === promocao?.origem
                       ? undefined
-                      : board[square]
+                      : boardVisivel[square]
                   const isDark = (Math.floor(index / 8) + index % 8) % 2 === 1
                   const isSelected = selected === square
                   const isLastMove = lastMove?.from === square || lastMove?.to === square
@@ -512,9 +584,24 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
             <header className="panel-header">
               Partida {mode === 'bot' ? `vs Computador (${dificuldadeLabel[difficulty]})` : '(Multijogador Local)'}
             </header>
-            <div className="turn-card" role="status">
-              <span className={`turn-dot ${turn}`} aria-hidden="true" />
-              Vez das {turn === 'w' ? 'brancas' : 'pretas'}
+            <div className={`turn-card${estaInspecionando ? ' inspecionando' : ''}`} role="status">
+              {estaInspecionando ? (
+                <>
+                  <span>Vendo lance {indiceAtivo + 1}/{jogadas.length}</span>
+                  <button
+                    type="button"
+                    className="voltar-ao-vivo"
+                    onClick={() => setIndiceVisualizado(null)}
+                  >
+                    Voltar ao jogo
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className={`turn-dot ${turn}`} aria-hidden="true" />
+                  Vez das {turn === 'w' ? 'brancas' : 'pretas'}
+                </>
+              )}
             </div>
             <div className="move-list" ref={moveListRef}>
               {moveRows.length === 0
@@ -522,14 +609,22 @@ export default function Chessboard({ mode, difficulty, corJogador, onVoltarMenu,
                 : moveRows.map((row, rowIndex) => (
                     <div className="move-row" key={rowIndex}>
                       <span className="move-number">{rowIndex + 1}.</span>
-                      <span className={`move-cell${rowIndex * 2 === history.length - 1 ? ' current' : ''}`}>
-                        {row.white.from}-{row.white.to}
-                      </span>
-                      {row.black
-                        ? <span className={`move-cell${rowIndex * 2 + 1 === history.length - 1 ? ' current' : ''}`}>
-                            {row.black.from}-{row.black.to}
-                          </span>
-                        : <span className="move-cell" />}
+                      <button
+                        type="button"
+                        className={`move-cell${row.whiteIdx === indiceAtivo ? ' current' : ''}`}
+                        onClick={() => inspecionarLance(row.whiteIdx)}
+                      >
+                        {row.white}
+                      </button>
+                      {row.black !== undefined && row.blackIdx !== undefined
+                        ? <button
+                            type="button"
+                            className={`move-cell${row.blackIdx === indiceAtivo ? ' current' : ''}`}
+                            onClick={() => inspecionarLance(row.blackIdx!)}
+                          >
+                            {row.black}
+                          </button>
+                        : <span className="move-cell vazio" />}
                     </div>
                   ))}
             </div>
