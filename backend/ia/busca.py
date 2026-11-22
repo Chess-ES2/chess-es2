@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 
 from ia.aberturas import consultar_livro
-from ia.avaliacao import avaliar_motor
+from ia.avaliacao import avaliar, avaliar_motor
 from ia.tabelas import VALOR_PECA
 from motor.jogo import aplicar_jogada
 from motor.movimentacao import Jogada
@@ -82,7 +82,8 @@ def _chave_jogada(jogada: Jogada) -> tuple[str, str, TipoPeca | None]:
 
 def _nota(tabuleiro: Tabuleiro) -> int:
     # Negamax: a nota é sempre do ponto de vista de quem tem o turno.
-    nota = avaliar_motor(tabuleiro)
+    ctx = _ctx_atual
+    nota = avaliar_motor(tabuleiro) if (ctx is not None and ctx.usar_tapered) else avaliar(tabuleiro)
     return nota if tabuleiro.turno == Cor.BRANCA else -nota
 
 
@@ -128,16 +129,23 @@ class _TempoEsgotado(Exception):
 
 
 class _ContextoBusca:
-    __slots__ = ("prazo", "quiescencia", "nos", "killers")
+    __slots__ = ("prazo", "quiescencia", "usar_tapered", "nos", "ply", "killers")
 
-    def __init__(self, tempo_limite_ms: float | None, quiescencia: bool) -> None:
+    def __init__(
+        self,
+        tempo_limite_ms: float | None,
+        quiescencia: bool,
+        usar_tapered: bool = True,
+    ) -> None:
         self.prazo: float | None = (
             time.perf_counter() + tempo_limite_ms / 1000.0
             if tempo_limite_ms is not None
             else None
         )
         self.quiescencia = quiescencia
+        self.usar_tapered = usar_tapered
         self.nos = 0
+        self.ply = 0
         self.killers: dict[int, list[tuple[str, str, TipoPeca | None]]] = {}
 
     def checar_tempo(self) -> None:
@@ -155,6 +163,9 @@ class _ContextoBusca:
             self.killers[ply] = [chave]
         elif lista[0] != chave:
             self.killers[ply] = [chave, lista[0]]
+
+
+_ctx_atual: _ContextoBusca | None = None
 
 
 def _quiescencia(
@@ -199,30 +210,32 @@ def _negamax(
     profundidade: int,
     alpha: int,
     beta: int,
-    ctx: _ContextoBusca,
-    ply: int = 0,
 ) -> int:
-    ctx.checar_tempo()
+    ctx = _ctx_atual
+    if ctx is not None:
+        ctx.checar_tempo()
 
     alpha_orig = alpha
-    h = hash_zobrist(tabuleiro)
-    entrada = _TT.get(h)
+    usar_tt = ctx is not None
+    h = hash_zobrist(tabuleiro) if usar_tt else 0
     chave_tt: tuple[str, str, TipoPeca | None] | None = None
 
-    if entrada is not None:
-        tt_prof, tt_val, tt_flag, chave_tt = entrada
-        if tt_prof >= profundidade:
-            if tt_flag == _TT_EXACT:
-                return tt_val
-            if tt_flag == _TT_LOWER:
-                alpha = max(alpha, tt_val)
-            elif tt_flag == _TT_UPPER:
-                beta = min(beta, tt_val)
-            if alpha >= beta:
-                return tt_val
+    if usar_tt:
+        entrada = _TT.get(h)
+        if entrada is not None:
+            tt_prof, tt_val, tt_flag, chave_tt = entrada
+            if tt_prof >= profundidade:
+                if tt_flag == _TT_EXACT:
+                    return tt_val
+                if tt_flag == _TT_LOWER:
+                    alpha = max(alpha, tt_val)
+                elif tt_flag == _TT_UPPER:
+                    beta = min(beta, tt_val)
+                if alpha >= beta:
+                    return tt_val
 
     if profundidade == 0:
-        if ctx.quiescencia:
+        if ctx is not None and ctx.quiescencia:
             return _quiescencia(tabuleiro, alpha, beta, ctx)
         return _nota(tabuleiro)
 
@@ -234,31 +247,38 @@ def _negamax(
 
     melhor_valor = -_INFINITO
     melhor_chave: tuple[str, str, TipoPeca | None] | None = None
-    killers_ply = ctx.killers.get(ply)
+    ply = ctx.ply if ctx is not None else 0
+    killers_ply = ctx.killers.get(ply) if ctx is not None else None
 
     for jogada in _ordenar(movimentos, chave_tt, killers_ply):
         copia = tabuleiro.copiar()
         aplicar_jogada(copia, jogada)
-        valor = -_negamax(copia, profundidade - 1, -beta, -alpha, ctx, ply + 1)
+        if ctx is not None:
+            ctx.ply = ply + 1
+        valor = -_negamax(copia, profundidade - 1, -beta, -alpha)
+        if ctx is not None:
+            ctx.ply = ply
         if valor > melhor_valor:
             melhor_valor = valor
             melhor_chave = _chave_jogada(jogada)
         if valor > alpha:
             alpha = valor
         if alpha >= beta:
-            ctx.registrar_killer(ply, jogada)
+            if ctx is not None:
+                ctx.registrar_killer(ply, jogada)
             break
 
-    if len(_TT) >= _TT_MAX_ENTRADAS:
-        _TT.clear()
+    if usar_tt:
+        if len(_TT) >= _TT_MAX_ENTRADAS:
+            _TT.clear()
 
-    if melhor_valor <= alpha_orig:
-        flag = _TT_UPPER
-    elif melhor_valor >= beta:
-        flag = _TT_LOWER
-    else:
-        flag = _TT_EXACT
-    _TT[h] = (profundidade, melhor_valor, flag, melhor_chave)
+        if melhor_valor <= alpha_orig:
+            flag = _TT_UPPER
+        elif melhor_valor >= beta:
+            flag = _TT_LOWER
+        else:
+            flag = _TT_EXACT
+        _TT[h] = (profundidade, melhor_valor, flag, melhor_chave)
 
     return melhor_valor
 
@@ -270,26 +290,33 @@ def _buscar_raiz(
     ctx: _ContextoBusca,
     melhor_anterior: Jogada | None = None,
 ) -> tuple[Jogada, int]:
-    chave_tt = _chave_jogada(melhor_anterior) if melhor_anterior is not None else None
-    if chave_tt is None:
-        entrada = _TT.get(hash_zobrist(tabuleiro))
-        if entrada is not None:
-            chave_tt = entrada[3]
+    global _ctx_atual
+    anterior_ctx = _ctx_atual
+    _ctx_atual = ctx
+    try:
+        chave_tt = _chave_jogada(melhor_anterior) if melhor_anterior is not None else None
+        if chave_tt is None:
+            entrada = _TT.get(hash_zobrist(tabuleiro))
+            if entrada is not None:
+                chave_tt = entrada[3]
 
-    ordenadas = _ordenar(movimentos, chave_tt)
-    melhor = ordenadas[0]
-    alpha = -_INFINITO
-    beta = _INFINITO
+        ordenadas = _ordenar(movimentos, chave_tt)
+        melhor = ordenadas[0]
+        alpha = -_INFINITO
+        beta = _INFINITO
 
-    for jogada in ordenadas:
-        copia = tabuleiro.copiar()
-        aplicar_jogada(copia, jogada)
-        valor = -_negamax(copia, profundidade - 1, -beta, -alpha, ctx, 1)
-        if valor > alpha:
-            alpha = valor
-            melhor = jogada
+        for jogada in ordenadas:
+            copia = tabuleiro.copiar()
+            aplicar_jogada(copia, jogada)
+            ctx.ply = 1
+            valor = -_negamax(copia, profundidade - 1, -beta, -alpha)
+            if valor > alpha:
+                alpha = valor
+                melhor = jogada
 
-    return melhor, alpha
+        return melhor, alpha
+    finally:
+        _ctx_atual = anterior_ctx
 
 
 def melhor_jogada(
@@ -312,13 +339,33 @@ def melhor_jogada(
         if lance_livro is not None:
             return lance_livro
 
-    # Iterative Deepening: sempre completa profundidade 1; aprofunda até profundidade alvo ou limite de tempo.
-    ctx_d1 = _ContextoBusca(tempo_limite_ms=None, quiescencia=usar_quiescencia)
+    usar_tapered = profundidade >= 2
+
+    # Sem limite de tempo: busca direta na profundidade pedida (compatível com chamadas diretas/testes)
+    if tempo_limite_ms is None:
+        ctx = _ContextoBusca(
+            tempo_limite_ms=None,
+            quiescencia=usar_quiescencia,
+            usar_tapered=usar_tapered,
+        )
+        melhor, _ = _buscar_raiz(tabuleiro, movimentos, profundidade, ctx)
+        return melhor
+
+    # Com orçamento de tempo: Iterative Deepening (sempre completa d=1 e aprofunda até profundidade/tempo)
+    ctx_d1 = _ContextoBusca(
+        tempo_limite_ms=None,
+        quiescencia=usar_quiescencia,
+        usar_tapered=usar_tapered,
+    )
     melhor, valor = _buscar_raiz(tabuleiro, movimentos, 1, ctx_d1)
     if profundidade <= 1 or abs(valor) >= VALOR_XEQUE_MATE - 100:
         return melhor
 
-    ctx = _ContextoBusca(tempo_limite_ms=tempo_limite_ms, quiescencia=usar_quiescencia)
+    ctx = _ContextoBusca(
+        tempo_limite_ms=tempo_limite_ms,
+        quiescencia=usar_quiescencia,
+        usar_tapered=usar_tapered,
+    )
     for prof_atual in range(2, profundidade + 1):
         try:
             candidato, valor = _buscar_raiz(tabuleiro, movimentos, prof_atual, ctx, melhor)

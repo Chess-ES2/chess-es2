@@ -3,6 +3,7 @@ from __future__ import annotations
 from motor.peca import Cor, TipoPeca
 from motor.tabuleiro import Tabuleiro
 from ia.tabelas import (
+    BONUS_POSICAO,
     PST_BRANCAS,
     PST_PRETAS,
     PST_REI_FINAL_BRANCAS,
@@ -37,6 +38,8 @@ def avaliar_posicional(tabuleiro: Tabuleiro) -> int:
     # Soma o bônus de posição das peças brancas e subtrai o das pretas.
     nota = 0
     for casa, peca in tabuleiro.pecas.items():
+        if BONUS_POSICAO.get(peca.tipo) is None:
+            continue
         if peca.cor == Cor.BRANCA:
             nota += PST_BRANCAS[peca.tipo][casa]
         else:

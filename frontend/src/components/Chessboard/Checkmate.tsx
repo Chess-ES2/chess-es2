@@ -4,6 +4,7 @@ import './Checkmate.css'
 
 type CheckmateProps = {
   vencedor: Color
+  mostrarTrocarLados?: boolean
   onVerTabuleiro: () => void
   onVoltarMenu: () => void
   onTrocarLados: () => void
@@ -11,6 +12,7 @@ type CheckmateProps = {
 
 export default function Checkmate({
   vencedor,
+  mostrarTrocarLados = true,
   onVerTabuleiro,
   onVoltarMenu,
   onTrocarLados,
@@ -48,23 +50,25 @@ export default function Checkmate({
             </button>
           </div>
 
-          <div className="checkmate-linha">
-            <button type="button" className="checkmate-revanche" onClick={onTrocarLados}>
-              Revanche
-            </button>
-            <span className="checkmate-dica">
-              <button
-                type="button"
-                className="checkmate-ajuda"
-                aria-label="A revanche troca os lados da partida"
-              >
-                ?
+          {mostrarTrocarLados && (
+            <div className="checkmate-linha">
+              <button type="button" className="checkmate-revanche" onClick={onTrocarLados}>
+                Revanche
               </button>
-              <span className="checkmate-dica-texto" role="tooltip">
-                A revanche troca os lados da partida
+              <span className="checkmate-dica">
+                <button
+                  type="button"
+                  className="checkmate-ajuda"
+                  aria-label="A revanche troca os lados da partida"
+                >
+                  ?
+                </button>
+                <span className="checkmate-dica-texto" role="tooltip">
+                  A revanche troca os lados da partida
+                </span>
               </span>
-            </span>
-          </div>
+            </div>
+          )}
         </div>
       </motion.div>
     </motion.div>
