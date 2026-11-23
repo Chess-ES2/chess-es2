@@ -2,6 +2,14 @@ import pytest
 
 from motor.jogo import Jogo, JogadaInvalida
 from motor.peca import Cor, TipoPeca
+from motor.tabuleiro import Tabuleiro
+from motor.validacao import (
+    esta_em_afogamento,
+    esta_em_xeque,
+    esta_em_xeque_mate,
+    empate_por_material_insuficiente,
+    obter_movimentos_validos,
+)
 
 
 class TestRoque:
@@ -11,8 +19,12 @@ class TestRoque:
         jogada = jogo.fazer_jogada("e1", "g1")
 
         assert jogada.e_roque is True
-        assert jogo.tabuleiro.obter("g1").tipo == TipoPeca.REI
-        assert jogo.tabuleiro.obter("f1").tipo == TipoPeca.TORRE
+        rei = jogo.tabuleiro.obter("g1")
+        torre = jogo.tabuleiro.obter("f1")
+        assert rei is not None
+        assert torre is not None
+        assert rei.tipo == TipoPeca.REI
+        assert torre.tipo == TipoPeca.TORRE
         assert jogo.tabuleiro.obter("e1") is None
         assert jogo.tabuleiro.obter("h1") is None
 
@@ -21,8 +33,12 @@ class TestRoque:
         jogada = jogo.fazer_jogada("e1", "c1")
 
         assert jogada.e_roque is True
-        assert jogo.tabuleiro.obter("c1").tipo == TipoPeca.REI
-        assert jogo.tabuleiro.obter("d1").tipo == TipoPeca.TORRE
+        rei = jogo.tabuleiro.obter("c1")
+        torre = jogo.tabuleiro.obter("d1")
+        assert rei is not None
+        assert torre is not None
+        assert rei.tipo == TipoPeca.REI
+        assert torre.tipo == TipoPeca.TORRE
         assert jogo.tabuleiro.obter("e1") is None
         assert jogo.tabuleiro.obter("a1") is None
 
@@ -63,8 +79,10 @@ class TestEnPassant:
         jogada = jogo.fazer_jogada("e5", "d6")
 
         assert jogada.e_en_passant is True
-        assert jogo.tabuleiro.obter("d6").tipo == TipoPeca.PEAO
-        assert jogo.tabuleiro.obter("d6").cor == Cor.BRANCA
+        peao = jogo.tabuleiro.obter("d6")
+        assert peao is not None
+        assert peao.tipo == TipoPeca.PEAO
+        assert peao.cor == Cor.BRANCA
         assert jogo.tabuleiro.obter("e5") is None
         assert jogo.tabuleiro.obter("d5") is None  # Peao capturado removido
 
@@ -74,8 +92,10 @@ class TestEnPassant:
         jogada = jogo.fazer_jogada("e4", "d3")
 
         assert jogada.e_en_passant is True
-        assert jogo.tabuleiro.obter("d3").tipo == TipoPeca.PEAO
-        assert jogo.tabuleiro.obter("d3").cor == Cor.PRETA
+        peao = jogo.tabuleiro.obter("d3")
+        assert peao is not None
+        assert peao.tipo == TipoPeca.PEAO
+        assert peao.cor == Cor.PRETA
         assert jogo.tabuleiro.obter("e4") is None
         assert jogo.tabuleiro.obter("d4") is None
 
@@ -105,6 +125,7 @@ class TestPromocao:
 
         assert jogada.promocao == TipoPeca.DAMA
         peca_promovida = jogo.tabuleiro.obter("e8")
+        assert peca_promovida is not None
         assert peca_promovida.tipo == TipoPeca.DAMA
         assert peca_promovida.cor == Cor.BRANCA
 
@@ -114,6 +135,7 @@ class TestPromocao:
 
         assert jogada.promocao == TipoPeca.CAVALO
         peca_promovida = jogo.tabuleiro.obter("e8")
+        assert peca_promovida is not None
         assert peca_promovida.tipo == TipoPeca.CAVALO
         assert peca_promovida.cor == Cor.BRANCA
 
@@ -125,5 +147,65 @@ class TestPromocao:
         assert jogada.e_captura() is True
         assert jogada.promocao == TipoPeca.TORRE
         peca_promovida = jogo.tabuleiro.obter("d8")
+        assert peca_promovida is not None
         assert peca_promovida.tipo == TipoPeca.TORRE
         assert peca_promovida.cor == Cor.BRANCA
+
+
+class TestXeque:
+
+    def test_rei_branco_em_xeque_por_torre(self):
+        tab = Tabuleiro.de_fen("4r3/8/8/8/8/8/8/4K3 w")
+        assert esta_em_xeque(tab, Cor.BRANCA) is True
+
+    def test_rei_branco_nao_esta_em_xeque(self):
+        tab = Tabuleiro.de_fen("4r3/8/8/8/8/8/4R3/4K3 w")
+        assert esta_em_xeque(tab, Cor.BRANCA) is False
+
+    def test_rei_branco_em_xeque_por_peao(self):
+        tab = Tabuleiro.de_fen("8/8/8/8/8/8/3p4/4K3 w")
+        assert esta_em_xeque(tab, Cor.BRANCA) is True
+
+    def test_ataque_bloqueado_nao_e_xeque(self):
+        tab = Tabuleiro.de_fen("4r3/8/8/8/8/4P3/8/4K3 w")
+        assert esta_em_xeque(tab, Cor.BRANCA) is False
+
+    def test_movimento_que_deixa_o_proprio_rei_em_xeque_e_invalido(self):
+        tab = Tabuleiro.de_fen("4r3/8/8/8/8/8/4R3/4K3 w")
+        movimentos = obter_movimentos_validos(tab, "e2")
+        destinos = [movimento.destino for movimento in movimentos]
+
+        assert "d2" not in destinos
+        assert "f2" not in destinos
+
+    def test_rei_preto_em_xeque_mate(self):
+        tab = Tabuleiro.de_fen("7k/6Q1/5K2/8/8/8/8/8 b")
+        assert esta_em_xeque_mate(tab, Cor.PRETA) is True
+
+    def test_peao_nao_da_xeque_para_frente(self):
+        tab = Tabuleiro.de_fen("8/8/8/8/8/8/4p3/4K3 w")
+        assert esta_em_xeque(tab, Cor.BRANCA) is False
+
+    def test_rei_preto_em_afogamento(self):
+        tab = Tabuleiro.de_fen("7k/5Q2/6K1/8/8/8/8/8 b")
+        assert esta_em_afogamento(tab, Cor.PRETA) is True
+
+    def test_empate_por_rei_contra_rei(self):
+        tab = Tabuleiro.de_fen("4k3/8/8/8/8/8/8/4K3 w")
+        assert empate_por_material_insuficiente(tab) is True
+
+    def test_empate_por_rei_e_bispo_contra_rei(self):
+        tab = Tabuleiro.de_fen("4k3/8/8/8/8/8/8/2B1K3 w")
+        assert empate_por_material_insuficiente(tab) is True
+
+    def test_empate_por_rei_e_cavalo_contra_rei(self):
+        tab = Tabuleiro.de_fen("4k3/8/8/8/8/8/8/2N1K3 w")
+        assert empate_por_material_insuficiente(tab) is True
+
+    def test_empate_por_dois_bispos_na_mesma_cor(self):
+        tab = Tabuleiro.de_fen("4kb2/8/8/8/8/8/8/2B1K3 w")
+        assert empate_por_material_insuficiente(tab) is True
+
+    def test_dois_bispos_em_cores_diferentes_nao_sao_material_insuficiente(self):
+        tab = Tabuleiro.de_fen("4k1b1/8/8/8/8/8/8/2B1K3 w")
+        assert empate_por_material_insuficiente(tab) is False
