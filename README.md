@@ -6,6 +6,7 @@ Documentação:
 - [Cronograma-Gannt](https://docs.google.com/spreadsheets/d/1SOWDvGxckjB0B3mOY98AnQBcsC7bbVxy6Q-bGrFTeFM/edit?gid=1578635526#gid=1578635526)
 - [Slides-Apresentação-2](https://www.canva.com/design/DAHW-cChu10/zdGLB3z2tCbWna195MAFiA/edit)
 - [Gráfico AVA](https://docs.google.com/spreadsheets/d/1JaM0zrvAG_xRMVr6tqbV3LSPicThSVG_gpZtkAw7rlY/edit?usp=sharing)
+- [Slides-Apresentação-3](https://canva.link/0fzyy7i3nmbv8zy)
 
 ## Como rodar (frontend + backend juntos)
 
@@ -34,8 +35,11 @@ fetch('/api/partida/nova', { method: 'POST' }) // -> POST http://localhost:5000/
 Outros comandos:
 
 ```bash
-npm run setup   # só instala as dependências (backend + frontend)
-npm test        # testes do backend (pytest)
-npm run build   # build de produção do frontend
-npm run lint    # lint do frontend
+npm run setup       # só instala as dependências (backend + frontend)
+npm test            # testes do backend (pytest)
+npm run build       # build de produção do frontend
+npm run lint        # lint do frontend
+python -m pytest    # para rodar os testes do projeto
+python -m pytest --cov=api --cov=ia --cov=motor --cov-report=term-missing   # para analisar a cobertura de testes
+
 ```
